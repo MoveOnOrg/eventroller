@@ -1,0 +1,19 @@
+ve
+venv
+*.pyc
+#.*
+*#
+*~
+local_settings.py
+db.sqlite3
+site-packages
+/static
+*.sass-cache
+.env
+src
+
+# Elastic Beanstalk Files
+#commenting out -- but we'll have to add this if this became a public repo
+#.elasticbeanstalk/*
+#!.elasticbeanstalk/*.cfg.yml
+#!.elasticbeanstalk/*.global.yml
