@@ -19,6 +19,7 @@ CRM_TYPES = {
     #'osdi_endpoint'
 }
 
+
 class EventSource(models.Model):
    """
    This represents a source of data to fill event_store.models.Event

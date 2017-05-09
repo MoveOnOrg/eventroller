@@ -23,11 +23,11 @@ class Organization(models.Model):
     api_key = models.CharField(max_length=765, editable=False)
 
 
-class Host(models.Model):
+class Activist(models.Model):
     hashed_email = models.CharField(max_length=765, null=True, blank=True)
     email = models.CharField(max_length=765, null=True, blank=True)
     name = models.CharField(max_length=765, null=True, blank=True)
-    host_system_id = models.CharField(max_length=765)
+    member_system_id = models.CharField(max_length=765)
 
 
 EVENT_REVIEW_CHOICES = (('', 'New'),
@@ -85,7 +85,7 @@ class Event(models.Model):
     #eventIdObfuscated: {type: GraphQLString},
     organization_official_event = models.NullBooleanField(null=True)
     event_type = models.CharField(max_length=765)
-    organization_host = models.ForeignKey('Host', blank=True, null=True)
+    organization_host = models.ForeignKey('Activist', blank=True, null=True)
     organization = models.ForeignKey('Organization', blank=True, null=True, db_index=True)
     organization_source = models.ForeignKey('event_exim.EventSource', blank=True, null=True, db_index=True)
     organization_campaign = models.CharField(max_length=765, db_index=True)

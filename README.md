@@ -1,18 +1,18 @@
-=EventRoller
+# EventRoller
 
 For this project, the definition of an event is something that someone might RSVP to.
 It definitely has a time, though may not have a place, if it's virtual.
 
-== Apps
+## Apps
 
  * `event_store`: Basic event schema to accomodate different sources
  * `reviewer`: Admin interface and schemas to log reviews 
  * `event_exim`: Event exporter/importer -- traffic control and management for organziations
 
 
-== Basic Workflow User Story (not yet implemented)
+## Basic Workflow User Story (not yet implemented)
 
-=== As an organization that hosts events, with a CRM
+### As an organization that hosts events, with a CRM
 
 * To start, we create a Group for our Organization and add staff members as Users
 * In event_store we create an Organization record and connect it to the Group
@@ -21,13 +21,13 @@ It definitely has a time, though may not have a place, if it's virtual.
 * We also want Org2's non-duplicate events to populate and sync back to our CRM, so 
   in event_exim we create an Org2OrgShare record, and mark our CRM's EventSource as allowing updates
 
-==== Reviewing events
+#### Reviewing events
 
 * Some events come from volunteers which need to be reviewed
 * We mark our EventSource as allowing updates and go to the Event Reviewer view
   (which restricts by the organization(s) that I'm a group of.
 
-==== Sharing events
+#### Sharing events
 
 * Org2 has its own public map and event store, and wants to share our events
 * From our EventSource page, we can provide an API link that is public so they can pull in our events
