@@ -84,6 +84,42 @@ DATABASES = {
     }
 }
 
+if 'RDS_HOSTNAME' in os.environ:
+    DATABASES['default'] = { ### Signon Database!
+            'ENGINE': os.environ.get('RDS_DB_ENGINE', 'django.db.backends.postgresql_psycopg2'),
+            'NAME': os.environ['RDS_DB_NAME'],
+            'USER': os.environ['RDS_USERNAME'],
+            'PASSWORD': os.environ['RDS_PASSWORD'],
+            'HOST': os.environ['RDS_HOSTNAME'],
+            'PORT': os.environ['RDS_PORT'],
+    }
+
+#enable in cachalot local_settings when setting CACHES=
+#short table, and campaigns should update more often than other queries
+CACHALOT_UNCACHABLE_TABLES = ('events_campaign', 'events_event',)
+CACHALOT_ENABLED = False
+if 'REDISCACHE' in os.environ:
+    CACHES = {
+        'default': {
+            "BACKEND": "django_redis.cache.RedisCache",
+            "LOCATION": os.environ['REDISCACHE'].split(','), #"redis://127.0.0.1:6379/1",
+            "OPTIONS": {
+                "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            },
+            'KEY_PREFIX': os.environ.get('CACHE_PREFIX', ''),
+        },
+    }
+    CACHALOT_ENABLED = True
+
+BASE_URL = os.environ.get('BASE_URL')
+
+EMAIL_HOST = os.environ.get('EMAIL_HOST', '')
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+EMAIL_PORT = os.environ.get('EMAIL_PORT', '')
+EMAIL_USE_TLS = True
+
+FORCE_SCRIPT_NAME = None
 
 # Internationalization
 # https://docs.djangoproject.com/en/1.8/topics/i18n/
@@ -102,4 +138,17 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/1.8/howto/static-files/
 
-STATIC_URL = '/static/'
+STATIC_URL = os.environ.get('STATIC_URL', '/static/')
+STATIC_ROOT = '%s/static_build' % BASE_DIR
+
+if os.environ.get('LAMBDA_ZAPPA'):
+    SECRET_KEY = os.environ.get('DJANGO_BASE_SECRET', SECRET_KEY)
+    if os.environ.get('ALLOWED_HOSTS'):
+        ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS').split(',')
+    if 'FORCE_SCRIPT_NAME' in os.environ:
+        #this is for the prefix in deployed state before the / in the path
+        FORCE_SCRIPT_NAME = os.environ['FORCE_SCRIPT_NAME']
+
+if not os.environ.get('LAMBDA_ZAPPA') \
+   and os.path.exists(os.path.join(BASE_DIR, 'local_settings.py')):
+    from local_settings import *

@@ -57,15 +57,18 @@ class EventDupeGuesses(models.Model):
   source_event = models.ForeignKey(Event, related_name='dupe_guesses')
   dupe_event = models.ForeignKey(Event, related_name='dupe_guess_sources')
 
-  decision = models.IntegerField(choices=(
-       (0, 'undecided'),
-       (1, 'not a duplicate'),
-       (2, 'yes, duplicates')))
+  decision = models.IntegerField(choices=( (0, 'undecided'),
+                                           (1, 'not a duplicate'),
+                                           (2, 'yes, duplicates')))
 
 
 class Org2OrgShare(models.Model):
   event_source = models.ForeignKey(EventSource, related_name='share_sources')
   event_sink = models.ForeignKey(EventSource, related_name='share_sinks')
+
+  status = models.IntegerField(choices=( (-1, 'disabled'),
+                                         (0, 'offered'),
+                                         (1, 'enabled')))
 
   created_at = models.DateTimeField(auto_now_add=True)
   modified_at = models.DateTimeField(auto_now=True)

@@ -1,6 +1,6 @@
 from actionkit.api.event import AKEventAPI
 
-class ActionKitAPIWrapper:
+class Connector:
 
     def __init__(self, event_source):
         #self.akapi = AKEventAPI()
@@ -24,3 +24,6 @@ class ActionKitAPIWrapper:
     def get_host_event_link():
         #might include a temporary token
         pass
+
+    def writable():
+        return True
