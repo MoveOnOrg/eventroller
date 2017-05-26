@@ -1,10 +1,11 @@
-from __future__ import unicode_literals
-
+from django.conf import settings
+from django.contrib.auth.models import User, Group
+from django.contrib.postgres.fields import JSONField
 from django.db import models
+
 from event_store.models import Event, Organization
 from event_exim import connectors
 
-from django.contrib.auth.models import User, Group
 
 CRM_TYPES = {
     'actionkit_db': lambda: connectors.ActionKitDBWrapper,
@@ -28,16 +29,9 @@ class EventSource(models.Model):
    origin_organization = models.ForeignKey(Organization)
    osdi_name = models.CharField(max_length=765)
 
-   crm_type = models.CharField(max_length=16, choices=[(k,k) for k in CRM_TYPES.keys()])
+   crm_type = models.CharField(max_length=16, choices=[(k,k) for k in CRM_TYPES])
 
-   #Fields conditionally prompted based on crm_type, and meaning different things
-   url = models.CharField(max_length=765)
-   username = models.CharField(max_length=765)
-   password = models.CharField(max_length=765)
-   # (could be, e.g. actionkit campaign slug or id)
-   token_pw1 = models.CharField(max_length=765)
-   token_pw2 = models.CharField(max_length=765)
-   token_pw3 = models.CharField(max_length=765)
+   crm_data = JSONField(null=True, blank=True)
 
    #(provided: ping url for update (put this on your thanks page for event creation)
    update_style = models.IntegerField(choices=(
@@ -51,6 +45,15 @@ class EventSource(models.Model):
 
    #(test connection button)
    last_update = models.CharField(max_length=128)
+
+   @property
+   def data(self):
+      """
+      Canonical data for this record -- sometimes this can be loaded from settings
+      so that the database doesn't need to store a password in plaintext
+      """
+      settings_data = getattr(settings, 'EVENT_SOURCES', {})
+      return settings_data.get(self.name, self.crm_data)
 
 
 class EventDupeGuesses(models.Model):
@@ -69,6 +72,8 @@ class Org2OrgShare(models.Model):
   status = models.IntegerField(choices=( (-1, 'disabled'),
                                          (0, 'offered'),
                                          (1, 'enabled')))
+
+  filters = JSONField(null=True, blank=True)
 
   created_at = models.DateTimeField(auto_now_add=True)
   modified_at = models.DateTimeField(auto_now=True)
