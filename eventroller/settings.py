@@ -23,7 +23,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SECRET_KEY = 'l^7aj1l)+r(@9haz!_(w#8gp=u3ikl_0w$4cb89^-sb!&ur6p!'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = ('DEBUG' in os.environ)
 
 ALLOWED_HOSTS = []
 
@@ -84,14 +84,14 @@ DATABASES = {
     }
 }
 
-if 'RDS_HOSTNAME' in os.environ:
-    DATABASES['default'] = { ### Signon Database!
-            'ENGINE': os.environ.get('RDS_DB_ENGINE', 'django.db.backends.postgresql_psycopg2'),
-            'NAME': os.environ['RDS_DB_NAME'],
-            'USER': os.environ['RDS_USERNAME'],
-            'PASSWORD': os.environ['RDS_PASSWORD'],
-            'HOST': os.environ['RDS_HOSTNAME'],
-            'PORT': os.environ['RDS_PORT'],
+if 'DB_HOSTNAME' in os.environ:
+    DATABASES['default'] = {
+            'ENGINE': os.environ.get('DB_ENGINE', 'django.db.backends.postgresql_psycopg2'),
+            'NAME': os.environ['DB_NAME'],
+            'USER': os.environ['DB_USERNAME'],
+            'PASSWORD': os.environ['DB_PASSWORD'],
+            'HOST': os.environ['DB_HOSTNAME'],
+            'PORT': os.environ['DB_PORT'],
     }
 
 #enable in cachalot local_settings when setting CACHES=
@@ -109,6 +109,9 @@ if 'REDISCACHE' in os.environ:
             'KEY_PREFIX': os.environ.get('CACHE_PREFIX', ''),
         },
     }
+    if settings.DEBUG:
+        CACHES['default']['OPTIONS']["REDIS_CLIENT_CLASS"] = "fakeredis.FakeStrictRedis"
+
     CACHALOT_ENABLED = True
 
 BASE_URL = os.environ.get('BASE_URL')
