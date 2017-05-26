@@ -6,12 +6,9 @@ from event_exim import connectors
 
 from django.contrib.auth.models import User, Group
 
-from connectors.actionkit_db import ActionKitDBWrapper
-from connectors.actionkit_api import ActionKitAPIWrapper
-
 CRM_TYPES = {
-    'actionkit_db': ActionKitDBWrapper,
-    'actionkit_api': ActionKitAPIWrapper,
+    'actionkit_db': lambda: connectors.ActionKitDBWrapper,
+    'actionkit_api': lambda: connectors.ActionKitAPIWrapper,
     #'facebook',
     #'actionnetwork',
     #'bsd',
