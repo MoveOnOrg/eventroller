@@ -41,6 +41,7 @@ INSTALLED_APPS = (
     'event_store',
     'reviewer',
     'event_exim',
+    'event_review',
 )
 
 MIDDLEWARE_CLASSES = (
