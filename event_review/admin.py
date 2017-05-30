@@ -4,7 +4,7 @@ from event_store.models import Event
 
 @admin.register(Event)
 class EventAdmin(admin.ModelAdmin):
-    list_display = ('slug',
+    list_display = ('title',
                     'organization_status_review',
                     'organization_status_prep',
                     'status',
