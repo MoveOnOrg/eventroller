@@ -1,7 +1,10 @@
+import importlib
+
 from django.conf import settings
 from django.contrib.auth.models import User, Group
 from django.contrib.postgres.fields import JSONField
 from django.db import models
+from django.utils.functional import cached_property
 
 from event_store.models import Event, Organization
 from event_exim import connectors
@@ -54,6 +57,11 @@ class EventSource(models.Model):
       """
       settings_data = getattr(settings, 'EVENT_SOURCES', {})
       return settings_data.get(self.name, self.crm_data)
+
+   @cached_property
+   def api(self):
+      connector_module = importlib.import_module('event_exim.connectors.%s' % self.crm_type)
+      return connector_module.Connector(self)
 
 
 class EventDupeGuesses(models.Model):

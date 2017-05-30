@@ -1,7 +1,9 @@
 from __future__ import unicode_literals
+import hashlib
 
 from django.db import models
 from django.contrib.auth.models import User, Group
+from django.contrib.postgres.fields import JSONField
 
 class Organization(models.Model):
     title = models.CharField(max_length=765)
@@ -24,10 +26,21 @@ class Organization(models.Model):
 
 
 class Activist(models.Model):
-    hashed_email = models.CharField(max_length=765, null=True, blank=True)
+    hashed_email = models.CharField(max_length=64, null=True, blank=True,
+                                    help_text="sha256 hash hexdigest of the email address")
     email = models.CharField(max_length=765, null=True, blank=True)
     name = models.CharField(max_length=765, null=True, blank=True)
     member_system_id = models.CharField(max_length=765)
+    member_system = models.ForeignKey('event_exim.EventSource', blank=True, null=True, db_index=True)
+    phone = models.CharField(max_length=75, null=True, blank=True)
+
+    def hash(self, email=None):
+        """Should work as a class OR instance method"""
+        if email is None:
+            email = self.email
+            if email is None:
+                raise Exception("You need to set the email or send it as an argument")
+        return hashlib.sha256(email.encode('utf-8')).hexdigest()
 
 
 EVENT_REVIEW_CHOICES = (('', 'New'),
@@ -74,27 +87,33 @@ class Event(models.Model):
     is_approved = models.IntegerField()
     attendee_count = models.IntegerField()
     max_attendees = models.IntegerField(null=True, blank=True)
-    venue = models.CharField(max_length=765)
-    phone = models.CharField(max_length=765)
-    public_description = models.TextField()
-    directions = models.TextField()
-    note_to_attendees = models.TextField()
-    notes = models.TextField()
+    venue = models.CharField(max_length=765, blank=True)
+    phone = models.CharField(max_length=765, blank=True)
+    public_description = models.TextField(blank=True)
+    directions = models.TextField(blank=True)
+    note_to_attendees = models.TextField(blank=True)
+    notes = models.TextField(blank=True)
 
     #from ground-control
     #eventIdObfuscated: {type: GraphQLString},
     organization_official_event = models.NullBooleanField(null=True)
-    event_type = models.CharField(max_length=765)
+    event_type = models.CharField(max_length=765, null=True, blank=True)
     organization_host = models.ForeignKey('Activist', blank=True, null=True)
     organization = models.ForeignKey('Organization', blank=True, null=True, db_index=True)
     organization_source = models.ForeignKey('event_exim.EventSource', blank=True, null=True, db_index=True)
     organization_campaign = models.CharField(max_length=765, db_index=True)
+    organization_source_id = models.CharField(max_length=765, db_index=True)
+
+    #this can be any other data the event source wants/needs to store
+    # in this field to resolve additional information.  It can be the original data,
+    # but could also be more extended info like social sharing data
+    source_json_data = JSONField(null=True, blank=True)
 
     #hostId: {type: GraphQLString}, = add primary_host
     #localTimezone: {type: GraphQLString}, #not there, but starts_at + starts_at_utc sorta does that
     #duration: {type: GraphQLInt},
     is_searchable = models.IntegerField(choices=((0, 'not searchable'), (1, 'searchable')))
-    private_phone = models.CharField(max_length=765)
+    private_phone = models.CharField(max_length=765, blank=True)
     
     #?todo
     #hostReceiveRsvpEmails: {type: GraphQLBoolean},
@@ -116,6 +135,7 @@ class Event(models.Model):
     share_url = models.URLField(blank=True)
     #share_options[] = facebook_share{title, desc, img}, twitter_share{msg}, email_share{subj,body}
 
+    # See https://opencivicdata.readthedocs.io/en/latest/proposals/0002.html
     political_scope = models.CharField(max_length=765, null=True, blank=True) #ocdep, districts, etc maybe
 
     dupe_id = models.ForeignKey('self', null=True, blank=True, on_delete=models.SET_NULL)
