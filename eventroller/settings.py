@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/1.8/ref/settings/
 """
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
+import json
 import os
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -114,6 +115,8 @@ if 'REDISCACHE' in os.environ:
         CACHES['default']['OPTIONS']["REDIS_CLIENT_CLASS"] = "fakeredis.FakeStrictRedis"
 
     CACHALOT_ENABLED = True
+
+EVENT_SOURCES = json.loads(os.environ.get('EVENT_SOURCES', '{}'))
 
 BASE_URL = os.environ.get('BASE_URL')
 
