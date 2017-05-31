@@ -1,0 +1,13 @@
+EVENT_SOURCES = {
+    'example.com': {
+        'crm_type': 'actionkit_api',
+        'ak_secret': 'foobar',
+        'api_user': 'xyz',
+        'api_password': 'password',
+        'base_url': 'https://roboticdogs.actionkit.com',
+        'ignore_host_ids': '123,345',
+        'max_event_load': 100,
+    },
+}
+
+DEBUG = True
