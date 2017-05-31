@@ -59,14 +59,13 @@ EVENT_PREP_CHOICES = (('', 'Unclaimed'),
                       ('nocontact', 'Unable to contact'))
 
 CHOICES = {
-    #venues
     'unknown': 0,
+    #venues
     'private home': 1,
     'public space': 2,
     'target location (e.g. congressional district office)': 3,
     'virtual': 4,
     #ticket types
-    'ticketed': 0,
     'open': 1,
     'ticketed': 2,
     #is_private
@@ -153,7 +152,7 @@ class Event(models.Model):
     #osdi
     osdi_origin_system = models.CharField(max_length=765)
     #ticket_levels[]
-    ticket_type = models.IntegerField(choices=((0, 'ticketed'), (1, 'open'), (2, 'ticketed')))
+    ticket_type = models.IntegerField(choices=((0, 'unknown'), (1, 'open'), (2, 'ticketed')))
     share_url = models.URLField(blank=True)
     #share_options[] = facebook_share{title, desc, img}, twitter_share{msg}, email_share{subj,body}
 
