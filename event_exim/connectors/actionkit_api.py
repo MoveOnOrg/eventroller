@@ -2,15 +2,18 @@ import re
 
 from actionkit.api.event import AKEventAPI
 from actionkit.api.user import AKUserAPI
-from event_store.models import Activist, Event
+from event_store.models import Activist, Event, CHOICES
 
 """
 Non-standard use in ActionKit:
 * We assume a user field called "recent_phone" (because the phone table is a big pain)
 * Custom Event Field mappings:
-  review_status
-  prep_status
-
+  - review_status
+  - prep_status
+  - needs_organizer_help
+  - political_scope
+  - public_phone
+  - venue_category
 
 """
 
@@ -22,7 +25,7 @@ class AKAPI(AKUserAPI, AKEventAPI):
 class Connector:
 
     CAMPAIGNS_CACHE = {}
-    HOSTS_CACHE = {}
+    USER_CACHE = {}
 
     common_fields = ('address1', 'address2',
                      'city', 'state', 'region', 'postal', 'zip', 'plus4', 'country',
@@ -42,7 +45,7 @@ class Connector:
 
     @classmethod
     def parameters(cls):
-        return {'campaign': {'help_text': 'ID (a number) of campaign if just for a single campaign'
+        return {'campaign': {'help_text': 'ID (a number) of campaign if just for a single campaign',
                              'required': False},
                 'api_password': {'help_text': 'api password',
                             'required': True},
@@ -62,8 +65,9 @@ class Connector:
 
     def __init__(self, event_source):
         self.source = event_source
-        self.base_url = data['base_url']
         data = event_source.data
+
+        self.base_url = data['base_url']
         class aksettings:
             AK_BASEURL = data['base_url']
             AK_USER = data['api_user']
@@ -77,12 +81,12 @@ class Connector:
         if campaign_path in self.CAMPAIGNS_CACHE:
             return self.CAMPAIGNS_CACHE[campaign_path]
         res = self.akapi.client.get('{}{}'.format(self.base_url, campaign_path))
-        if res.status == 200:
+        if res.status_code == 200:
             c = res.json()
             if c.get('eventsignuppages'):
                 signup = self.akapi.client.get('{}{}'.format(
                     self.base_url, c['eventsignuppages'][0]))
-                if signup.status == 200:
+                if signup.status_code == 200:
                     c['_SIGNUPPAGE'] = signup.json()
             self.CAMPAIGNS_CACHE[campaign_path] = c
         else:
@@ -100,7 +104,7 @@ class Connector:
             user = self.akapi.client.get('{}{}'.format(self.base_url, user_url)).json()
             host, created = Activist.objects.get_or_create(
                 member_system=self.source,
-                member_system_id=user['id'],
+                member_system_pk=user['id'],
                 defaults={'name': '{} {}'.format(user['first_name'], user['last_name']),
                           'email': user['email'],
                           'hashed_email': Activist.hash(user['email']),
@@ -108,7 +112,7 @@ class Connector:
             ocdep_str = None
             if user['zip']:
                 location = self.akapi.client.get('{}/rest/v1/location/{}'.format(self.base_url, user['id']))
-                if location.status == 200:
+                if location.status_code == 200:
                     district = location.json()['us_district']
                     if district:
                         state, dist = district.split('_')
@@ -143,9 +147,9 @@ class Connector:
                      'event_type': 'unknown',
                      'organization_host': host,
                      'organization_source': self.source,
-                     'organization_source_id': ak_event_json['id'],
-                     'organization' self.source.origin_organization,
-                     'organization_campaign': self.campaign.get('title'),
+                     'organization_source_pk': ak_event_json['id'],
+                     'organization': self.source.origin_organization,
+                     'organization_campaign': campaign.get('title'),
                      'is_searchable': (ak_event_json['status'] == 'active'
                                        and not ak_event_json['is_private']),
                      'private_phone': ak_event_json.get('phone'),
@@ -153,12 +157,12 @@ class Connector:
                      'url': rsvp_url, #could also link to search page with hash
                      'slug': slug,
                      'osdi_origin_system': self.base_url,
-                     'ticket_type': 'open',
+                     'ticket_type': CHOICES['open'],
                      'share_url': search_url,
                      #e.g. NC cong district 2 = "ocd-division/country:us/state:nc/cd:2"
                      'political_scope': eventfields.get('political_scope', ocdep_location),
                      #'dupe_id': None, #no need to set it
-                     'venue_category': eventfields.get('political_scope', 'unknown'),
+                     'venue_category': CHOICES[eventfields.get('venue_category', 'unknown')],
                      #TODO: if host_ids are only hosts, then yes, but we need a better way to filter role=host signups
                      'needs_organizer_help': eventfields.get('needs_organizer_help') == 'needs_organizer_help',
                      'rsvp_url': rsvp_url,
@@ -183,28 +187,28 @@ class Connector:
     def update_event(self, event):
         pass
 
-    def look_for_new_events(self):
+    def event_updates(self, last_updated):
         # note that the event_source object will have a 'last updated' value
         pass
         
-    def load_all_events(self):
+    def load_all_events(self, max_events=None):
         next_url = '/rest/v1/event/?order_by=-id'
         campaign = self.source.data.get('campaign')
         if campaign:
             next_url = '{}&campaign={}'.format(next_url, campaign)
         all_events = []
-        max_events = self.source.data.get('max_event_load')
+        max_events = max_events or self.source.data.get('max_event_load')
         event_count = 0
         while next_url and (not max_events or event_count < max_events):
             res = self.akapi.client.get('{}{}'.format(self.base_url, next_url))
-            if res.status != 200:
+            if res.status_code != 200:
                 next_url = None
             else:
                 events = res.json()
                 next_url = events['meta'].get('next')
                 for e_json in events.get('objects', []):
                     event_count = event_count + 1
-                    all_events.append(self._convert_event(e_json)
+                    all_events.append(self._convert_event(e_json))
         return all_events
 
     def update_review(self, review):

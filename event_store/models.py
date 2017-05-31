@@ -24,13 +24,16 @@ class Organization(models.Model):
     # for getting other folks' data; auto/re-generatable
     api_key = models.CharField(max_length=765, editable=False)
 
+    def __str__(self):
+        return self.title
+
 
 class Activist(models.Model):
     hashed_email = models.CharField(max_length=64, null=True, blank=True,
                                     help_text="sha256 hash hexdigest of the email address")
     email = models.CharField(max_length=765, null=True, blank=True)
     name = models.CharField(max_length=765, null=True, blank=True)
-    member_system_id = models.CharField(max_length=765)
+    member_system_pk = models.CharField(max_length=765, null=True, blank=True)
     member_system = models.ForeignKey('event_exim.EventSource', blank=True, null=True, db_index=True)
     phone = models.CharField(max_length=75, null=True, blank=True)
 
@@ -54,6 +57,25 @@ EVENT_PREP_CHOICES = (('', 'Unclaimed'),
                       ('partially_prepped', 'Partially prepped'),
                       ('fully_prepped', 'Fully prepped'),
                       ('nocontact', 'Unable to contact'))
+
+CHOICES = {
+    #venues
+    'unknown': 0,
+    'private home': 1,
+    'public space': 2,
+    'target location (e.g. congressional district office)': 3,
+    'virtual': 4,
+    #ticket types
+    'ticketed': 0,
+    'open': 1,
+    'ticketed': 2,
+    #is_private
+    'public': 0,
+    'private': 1,
+    #is_searchable
+    'not searchable': 0,
+    'searchable': 1,
+}
 
 class Event(models.Model):
     #starting with ActionKit baseline, out of selfishness
@@ -102,7 +124,7 @@ class Event(models.Model):
     organization = models.ForeignKey('Organization', blank=True, null=True, db_index=True)
     organization_source = models.ForeignKey('event_exim.EventSource', blank=True, null=True, db_index=True)
     organization_campaign = models.CharField(max_length=765, db_index=True)
-    organization_source_id = models.CharField(max_length=765, db_index=True)
+    organization_source_pk = models.CharField(max_length=765, blank=True, null=True, db_index=True)
 
     #this can be any other data the event source wants/needs to store
     # in this field to resolve additional information.  It can be the original data,
@@ -149,11 +171,11 @@ class Event(models.Model):
     needs_organizer_help = models.IntegerField(null=True, blank=True, default=0)
 
     #these can be functions of the source:
-    rsvp_url = models.URLField(blank=True)
-    event_facebook_url = models.URLField(blank=True)
-    organization_status_review = models.CharField(max_length=32, blank=True, db_index=True,
+    rsvp_url = models.URLField(blank=True, null=True)
+    event_facebook_url = models.URLField(blank=True, null=True)
+    organization_status_review = models.CharField(max_length=32, blank=True, null=True, db_index=True,
                                                   choices=EVENT_REVIEW_CHOICES)
-    organization_status_prep = models.CharField(max_length=32, blank=True, db_index=True,
+    organization_status_prep = models.CharField(max_length=32, blank=True, null=True, db_index=True,
                                                 choices=EVENT_PREP_CHOICES)
 
     #later

@@ -1,4 +1,6 @@
+import datetime
 import importlib
+import time
 
 from django.conf import settings
 from django.contrib.auth.models import User, Group
@@ -47,7 +49,7 @@ class EventSource(models.Model):
    allows_updates = models.IntegerField(default=0, choices=((0,'no'), (1,'yes')), help_text='as sink')
 
    #(test connection button)
-   last_update = models.CharField(max_length=128)
+   last_update = models.CharField(max_length=128, null=True, blank=True)
 
    @property
    def data(self):
