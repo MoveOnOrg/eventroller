@@ -26,11 +26,18 @@ class AKAPI(AKUserAPI, AKEventAPI):
     pass
 
 class Connector:
-
-    description = """This connects to ActionKit with the rest api -- queries are done through
-    ad-hoc report queries: https://roboticdogs.actionkit.com/docs/manual/api/rest/reports.html#running-an-ad-hoc-query
-    which is a strong
     """
+    This connects to ActionKit with the rest api -- queries are done through
+    ad-hoc report queries: https://roboticdogs.actionkit.com/docs/manual/api/rest/reports.html#running-an-ad-hoc-query
+    which is inelegant compared with browsing /rest/v1/event/ however, we can't get all the fields
+    we need from that one call, and it's currently impossible to sort by updated_at for easy syncing
+    and it's very difficult to get the hosts without browsing all signups.  Better would be a
+    way to filter eventsignups by role=host
+    """
+
+
+    description = ("ActionKit API connector that needs API- read-only access and API edit access"
+                   " if you are going to save event status back")
 
     CAMPAIGNS_CACHE = {}
     USER_CACHE = {}
