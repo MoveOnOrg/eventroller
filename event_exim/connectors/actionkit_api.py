@@ -35,7 +35,6 @@ class Connector:
     way to filter eventsignups by role=host
     """
 
-
     description = ("ActionKit API connector that needs API- read-only access and API edit access"
                    " if you are going to save event status back")
 
@@ -128,8 +127,13 @@ class Connector:
         self.akapi = AKAPI(aksettings)
         self.ignore_hosts = data['ignore_host_ids'] if 'ignore_host_ids' in data else []
 
-    def _events_sql(self, ordering='ee.updated_at', max_results=10000, offset=0,
+    def _load_events_from_sql(self, ordering='ee.updated_at', max_results=10000, offset=0,
                     excludes=[], additional_where=[], additional_params={}):
+        """
+        With appropriate sql query gets all the events via report/run/sql api
+        and returns None when there's an error or no events and returns
+        a list of event row lists with column indexes described by self.field_indexes
+        """
         if max_results > 10000:
             raise Exception("ActionKit doesn't permit adhoc sql queries > 10000 results")
         if not excludes:
@@ -216,9 +220,9 @@ class Connector:
         Returns an a dict with all event_store.Event model fields
         """
         excludes = self.source.data.get('excludes')
-        events = self._events_sql(excludes=excludes,
-                                  additional_where=['ee.id = {{event_id}}'],
-                                  additional_params={'event_id': event_id})
+        events = self._load_events_from_sql(excludes=excludes,
+                                            additional_where=['ee.id = {{event_id}}'],
+                                            additional_params={'event_id': event_id})
         if events:
             return self._convert_event(events[0])
 
@@ -239,10 +243,10 @@ class Connector:
         for offset in range(0, max_events, min(10000, max_events)):
             if event_count > max_events:
                 break
-            events = self._events_sql(offset=offset, excludes=excludes,
-                                      additional_where=additional_where,
-                                      additional_params=additional_params,
-                                      max_results=min(10000, max_events))
+            events = self._load_events_from_sql(offset=offset, excludes=excludes,
+                                                additional_where=additional_where,
+                                                additional_params=additional_params,
+                                                max_results=min(10000, max_events))
             if events:
                 for event_row in events:
                     event_count = event_count + 1
