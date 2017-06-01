@@ -37,13 +37,30 @@ class Activist(models.Model):
     member_system = models.ForeignKey('event_exim.EventSource', blank=True, null=True, db_index=True)
     phone = models.CharField(max_length=75, null=True, blank=True)
 
-    def hash(self, email=None):
+    def __str__(self):
+        return self.name or 'Activist {}:{}'.format(str(self.member_system), self.member_system_pk)
+
+    def hash(self_or_email, email=None):
         """Should work as a class OR instance method"""
         if email is None:
-            email = self.email
-            if email is None:
-                raise Exception("You need to set the email or send it as an argument")
+            if hasattr(self_or_email, 'email'):
+                email = getattr(self, 'email', None)
+                if email is None:
+                    raise Exception("You need to set the email or send it as an argument")
+            else:
+                email = self_or_email
         return hashlib.sha256(email.encode('utf-8')).hexdigest()
+
+    def likely_same(self, other):
+        eq_attrs = ('id', 'email', 'hashed_email', 'phone')
+        for attr in eq_attrs:
+            if getattr(self, attr) and getattr(self, attr)==getattr(other,attr,None):
+                return True
+        if self.member_system and self.member_system_pk\
+           and self.member_system_id == getattr(other,'member_system_id', None)\
+           and self.member_system_pk == getattr(other,'member_system_pk', None):
+            return True
+        return False
 
 
 EVENT_REVIEW_CHOICES = (('', 'New'),

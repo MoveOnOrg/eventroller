@@ -1,3 +1,4 @@
+import datetime
 import re
 
 from actionkit.api.event import AKEventAPI
@@ -17,6 +18,8 @@ Non-standard use in ActionKit:
 
 """
 
+#MYSQL 2016-12-12 18:00:00
+DATE_FMT = '%Y-%m-%d %H:%M:%S'
 
 class AKAPI(AKUserAPI, AKEventAPI):
     #merge both user and event apis in one class
@@ -24,20 +27,62 @@ class AKAPI(AKUserAPI, AKEventAPI):
 
 class Connector:
 
+    description = """This connects to ActionKit with the rest api -- queries are done through
+    ad-hoc report queries: https://roboticdogs.actionkit.com/docs/manual/api/rest/reports.html#running-an-ad-hoc-query
+    which is a strong
+    """
+
     CAMPAIGNS_CACHE = {}
     USER_CACHE = {}
 
-    common_fields = ('address1', 'address2',
+    #used for conversions
+    date_fields = ('starts_at', 'ends_at', 'starts_at_utc', 'ends_at_utc', 'updated_at')
+
+    common_fields = ['address1', 'address2',
                      'city', 'state', 'region', 'postal', 'zip', 'plus4', 'country',
                      'longitude', 'latitude',
                      'title', 'starts_at', 'ends_at', 'starts_at_utc', 'ends_at_utc', 'status', 'host_is_confirmed',
                      'is_private', 'is_approved', 'attendee_count', 'max_attendees',
                      'venue',
                      'public_description', 'directions', 'note_to_attendees', 'notes',
-                     'updated_at')
+                     'updated_at']
 
-    event_fields = set(['review_status', 'prep_status',
-                        'needs_organizer_help', 'political_scope', 'public_phone', 'venue_category'])
+    other_fields = ['ee.id', 'ee.creator_id', 'ee.campaign_id', 'ee.phone',
+                    'ec.title', 'signuppage.name',
+                    'u.id', 'u.first_name', 'u.last_name', 'u.email', 'loc.us_district', 'recentphone.value']
+
+    event_fields = ['review_status', 'prep_status',
+                    'needs_organizer_help', 'political_scope', 'public_phone', 'venue_category']
+
+    #column indexes for the above fields
+    field_indexes = {k:i for i,k in enumerate(common_fields + other_fields + event_fields)}
+
+    sql_query = (
+        "SELECT %(commonfields)s, %(otherfields)s, %(eventfields)s"
+        " FROM events_event ee"
+        " JOIN events_campaign ec ON ee.campaign_id = ec.id"
+        #host won't necessarily be unique but the GROUP BY will choose the first host signup
+        " LEFT JOIN events_eventsignup host ON (host.event_id = ee.id AND host.role='host'"
+        "                                        AND host.user_id NOT IN {{ excludes }} )"
+        " LEFT JOIN core_user u ON (u.id = host.user_id)"
+        " LEFT JOIN core_userfield recentphone ON (recentphone.parent_id = u.id AND recentphone.name = 'recent_phone')"
+        " LEFT JOIN core_location loc ON (loc.user_id = u.id)"
+        " JOIN core_eventsignuppage ces ON (ces.campaign_id = ec.id)"
+        " JOIN core_page signuppage ON (signuppage.id = ces.page_ptr_id AND signuppage.hidden=0)"
+        " %(eventjoins)s "
+        " xxADDITIONAL_WHERExx " #will be replaced with text or empty string on run
+        " GROUP BY ee.id" #make sure events are unique (might arbitrarily choose signup page, if multiple)
+        " ORDER BY {{ ordering }} DESC"
+        " LIMIT {{ max_results }}"
+        " OFFSET {{ offset }}"
+    ) % {'commonfields': ','.join(['ee.{}'.format(f) for f in common_fields]),
+         'otherfields': ','.join(other_fields),
+         'eventfields': ','.join(['{f}.value'.format(f=f) for f in event_fields]),
+         'eventjoins': ' '.join([("LEFT JOIN events_eventfield {f}"
+                                  " ON ({f}.parent_id=ee.id AND {f}.name = '{f}')"
+                              ).format(f=f) for f in event_fields]),
+                                   }
+
 
     @classmethod
     def writable(cls):
@@ -59,7 +104,7 @@ class Connector:
                               'required': False},
                 'ignore_host_ids': {'help_text': ('if you want to ignore certain hosts'
                                                   ' (due to automation/admin status) add'
-                                                  ' them as a comma separated list'),
+                                                  ' them as a json list of integers'),
                                     'required': False}
         }
 
@@ -76,140 +121,127 @@ class Connector:
         self.akapi = AKAPI(aksettings)
         self.ignore_hosts = data['ignore_host_ids'] if 'ignore_host_ids' in data else []
 
-    def _load_campaign(self, campaign_path):
-        """campaign_path will be in the form /rest/v1/campaign/<ID>/"""
-        if campaign_path in self.CAMPAIGNS_CACHE:
-            return self.CAMPAIGNS_CACHE[campaign_path]
-        res = self.akapi.client.get('{}{}'.format(self.base_url, campaign_path))
+    def _events_sql(self, ordering='ee.updated_at', max_results=10000, offset=0,
+                    excludes=[], additional_where=[], additional_params={}):
+        if max_results > 10000:
+            raise Exception("ActionKit doesn't permit adhoc sql queries > 10000 results")
+        if not excludes:
+            excludes = [0] #must have at least one value
+        where_clause = ''
+        if additional_where:
+            where_clause = ' WHERE %s' % ' AND '.join(additional_where)
+        query = {'query': self.sql_query.replace('xxADDITIONAL_WHERExx', where_clause),
+                 'ordering': ordering,
+                 'max_results': max_results,
+                 'offset': offset,
+                 'excludes': excludes}
+        query.update(additional_params)
+        res = self.akapi.client.post('{}/rest/v1/report/run/sql/'.format(self.base_url),
+                                     json=query)
         if res.status_code == 200:
-            c = res.json()
-            if c.get('eventsignuppages'):
-                signup = self.akapi.client.get('{}{}'.format(
-                    self.base_url, c['eventsignuppages'][0]))
-                if signup.status_code == 200:
-                    c['_SIGNUPPAGE'] = signup.json()
-            self.CAMPAIGNS_CACHE[campaign_path] = c
-        else:
-            #so we don't keep trying the same failing path
-            self.CAMPAIGNS_CACHE[campaign_path] = None
-        return self.CAMPAIGNS_CACHE[campaign_path]
+            return res.json()
 
-    def _load_host(self, user_url):
-        """
-        Sends host,location_string tuple back, from api+local database
-        """
-        if user_url in self.USER_CACHE:
-            return self.USER_CACHE[user_url]
-        try:
-            user = self.akapi.client.get('{}{}'.format(self.base_url, user_url)).json()
-            host, created = Activist.objects.get_or_create(
-                member_system=self.source,
-                member_system_pk=user['id'],
-                defaults={'name': '{} {}'.format(user['first_name'], user['last_name']),
-                          'email': user['email'],
-                          'hashed_email': Activist.hash(user['email']),
-                          'phone': user['fields'].get('recent_phone')})
-            ocdep_str = None
-            if user['zip']:
-                location = self.akapi.client.get('{}/rest/v1/location/{}'.format(self.base_url, user['id']))
-                if location.status_code == 200:
-                    district = location.json()['us_district']
-                    if district:
-                        state, dist = district.split('_')
-                        ocdep_str = 'ocd-division/country:us/state:{}/cd:{}'.format(state.lower(), dist)
-            self.USER_CACHE[user_url] = (host, ocdep_str)
-            return self.USER_CACHE[user_url]
-        except:
-            return (None, None)
+    def _convert_host(self, event_row):
+        fi = self.field_indexes
+        return Activist(member_system=self.source,
+                        member_system_pk=str(event_row[fi['u.id']]),
+                        name='{} {}'.format(event_row[fi['u.first_name']], event_row[fi['u.last_name']]),
+                        email=event_row[fi['u.email']],
+                        hashed_email=Activist.hash(event_row[fi['u.email']]),
+                        phone=event_row[fi['recentphone.value']])
 
-    def _convert_event(self, ak_event_json):
-        kwargs = {k:ak_event_json.get(k) for k in self.common_fields}
-        evt = Event(**kwargs)
-        campaign = self._load_campaign(ak_event_json['campaign'])
-        rsvp_url = None
-        search_url = None
-        if campaign and '_SIGNUPPAGE' in campaign:
-            rsvp_url = '{base}/event/{attend_page}/{event_id}/'.format(
-                base=self.base_url,
-                attend_page=campaign['_SIGNUPPAGE']['name'],
-                event_id=ak_event_json['id'])
-            search_url = '{base}/event/{attend_page}/search/'.format(
-                base=self.base_url,
-                attend_page=campaign['_SIGNUPPAGE']['name'])
-        slug = '{}-{}'.format(re.sub(r'\W', '', self.base_url.split('://')[1]),
-                              ak_event_json['id'])
-        eventfields = {}
-        host, ocdep_location = self._load_host(ak_event_json['creator'])
-        for eventfield in ak_event_json['fields']:
-            if eventfield['name'] in self.event_fields:
-                eventfields[eventfield['name']] = eventfield['value']
-        more_data = {'organization_official_event': False,
-                     'event_type': 'unknown',
-                     'organization_host': host,
-                     'organization_source': self.source,
-                     'organization_source_pk': ak_event_json['id'],
-                     'organization': self.source.origin_organization,
-                     'organization_campaign': campaign.get('title'),
-                     'is_searchable': (ak_event_json['status'] == 'active'
-                                       and not ak_event_json['is_private']),
-                     'private_phone': ak_event_json.get('phone'),
-                     'phone': eventfields.get('public_phone', ''),
-                     'url': rsvp_url, #could also link to search page with hash
-                     'slug': slug,
-                     'osdi_origin_system': self.base_url,
-                     'ticket_type': CHOICES['open'],
-                     'share_url': search_url,
-                     #e.g. NC cong district 2 = "ocd-division/country:us/state:nc/cd:2"
-                     'political_scope': eventfields.get('political_scope', ocdep_location),
-                     #'dupe_id': None, #no need to set it
-                     'venue_category': CHOICES[eventfields.get('venue_category', 'unknown')],
-                     #TODO: if host_ids are only hosts, then yes, but we need a better way to filter role=host signups
-                     'needs_organizer_help': eventfields.get('needs_organizer_help') == 'needs_organizer_help',
-                     'rsvp_url': rsvp_url,
-                     'event_facebook_url': None,
-                     'organization_status_review': eventfields.get('review_status'),
-                     'organization_status_prep': eventfields.get('prep_status'),
-        }
-        for k,v in more_data.items():
-            setattr(evt, k, v)
-        return evt
-        
+    def _convert_event(self, event_row):
+        """
+        Based on a row from self.sql_query, returns a
+        dict of fields that correspond directly to an event_store.models.Event object
+        """
+        fi = self.field_indexes
+        event_fields = {k:event_row[fi[k]] for k in self.common_fields}
+        signuppage = event_row[fi['signuppage.name']]
+        e_id = event_row[fi['ee.id']]
+        rsvp_url = (
+            '{base}/event/{attend_page}/{event_id}/'.format(
+                base=self.base_url, attend_page=signuppage, event_id=e_id)
+            if signuppage else None)
+        search_url = (
+            '{base}/event/{attend_page}/search/'.format(
+                base=self.base_url, attend_page=signuppage)
+            if signuppage else None)
+        slug = '{}-{}'.format(re.sub(r'\W', '', self.base_url.split('://')[1]), e_id)
+        state, district = (event_row[fi['loc.us_district']] or '_').split('_')
+        ocdep_location = ('ocd-division/country:us/state:{}/cd:{}'.format(state.lower(), district)
+                          if state and district else None)
+
+        event_fields.update({'organization_official_event': False,
+                             'event_type': 'unknown',
+                             'organization_host': self._convert_host(event_row),
+                             'organization_source': self.source,
+                             'organization_source_pk': str(e_id),
+                             'organization': self.source.origin_organization,
+                             'organization_campaign': event_row[fi['ec.title']],
+                             'is_searchable': (event_row[fi['status']] == 'active'
+                                               and not event_row[fi['is_private']]),
+                             'private_phone': event_row[fi['recentphone.value']] or '',
+                             'phone': event_row[fi['public_phone']] or '',
+                             'url': rsvp_url, #could also link to search page with hash
+                             'slug': slug,
+                             'osdi_origin_system': self.base_url,
+                             'ticket_type': CHOICES['open'],
+                             'share_url': search_url,
+                             #e.g. NC cong district 2 = "ocd-division/country:us/state:nc/cd:2"
+                             'political_scope': (event_row[fi['political_scope']] or ocdep_location),
+                             #'dupe_id': None, #no need to set it
+                             'venue_category': CHOICES[event_row[fi['venue_category']] or 'unknown'],
+                             #TODO: if host_ids are only hosts, then yes, but we need a better way to filter role=host signups
+                             'needs_organizer_help': event_row[fi['needs_organizer_help']] == 'needs_organizer_help',
+                             'rsvp_url': rsvp_url,
+                             'event_facebook_url': None,
+                             'organization_status_review': event_row[fi['review_status']],
+                             'organization_status_prep': event_row[fi['prep_status']],
+                         })
+        for df in self.date_fields:
+            if event_fields[df]:
+                event_fields[df] = datetime.datetime.strptime(event_fields[df], DATE_FMT)
+        return event_fields
 
     def get_event(self, event_id):
         """
-        Returns an (unsaved) event_store.Event model object with an (ActionKit/vendor) event_id
+        Returns an a dict with all event_store.Event model fields
         """
-        res = self.akapi.get_event(event_id)
-        if 'res' in res:
-            return self._convert_event(res['res'].json())
-        return None
+        excludes = self.source.data.get('excludes')
+        events = self._events_sql(excludes=excludes,
+                                  additional_where=['ee.id = {{event_id}}'],
+                                  additional_params={'event_id': event_id})
+        if events:
+            return self._convert_event(events[0])
 
-    def update_event(self, event):
-        pass
-
-    def event_updates(self, last_updated):
-        # note that the event_source object will have a 'last updated' value
-        pass
-        
-    def load_all_events(self, max_events=None):
-        next_url = '/rest/v1/event/?order_by=-id'
+    def load_events(self, max_events=None, last_updated=None):
+        additional_where = []
+        additional_params = {}
         campaign = self.source.data.get('campaign')
+        excludes = self.source.data.get('excludes')
         if campaign:
-            next_url = '{}&campaign={}'.format(next_url, campaign)
+            additional_where.append('ee.campaign_id = {{ campaign_id }}')
+            additional_params['campaign_id'] = campaign
+        if last_updated:
+            additional_where.append('ee.updated_at > {{ last_updated }}')
+            additional_params['last_updated'] = last_updated
         all_events = []
         max_events = max_events or self.source.data.get('max_event_load')
         event_count = 0
-        while next_url and (not max_events or event_count < max_events):
-            res = self.akapi.client.get('{}{}'.format(self.base_url, next_url))
-            if res.status_code != 200:
-                next_url = None
-            else:
-                events = res.json()
-                next_url = events['meta'].get('next')
-                for e_json in events.get('objects', []):
+        for offset in range(0, max_events, min(10000, max_events)):
+            if event_count > max_events:
+                break
+            events = self._events_sql(offset=offset, excludes=excludes,
+                                      additional_where=additional_where,
+                                      additional_params=additional_params,
+                                      max_results=min(10000, max_events))
+            if events:
+                for event_row in events:
                     event_count = event_count + 1
-                    all_events.append(self._convert_event(e_json))
-        return all_events
+                    all_events.append(self._convert_event(event_row))
+        return {'events': all_events,
+                'last_updated': datetime.datetime.utcnow().strftime(DATE_FMT)}
 
     def update_review(self, review):
         pass
