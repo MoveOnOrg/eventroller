@@ -8,12 +8,12 @@ from django.contrib.postgres.fields import JSONField
 from django.db import models
 from django.utils.functional import cached_property
 
-from event_store.models import Event, Organization
+from event_store.models import Activist, Event, Organization
 from event_exim import connectors
 
 
 CRM_TYPES = {
-    'actionkit_db': lambda: connectors.ActionKitDBWrapper,
+    #'actionkit_db': lambda: connectors.ActionKitDBWrapper,
     'actionkit_api': lambda: connectors.ActionKitAPIWrapper,
     #'facebook',
     #'actionnetwork',
@@ -51,6 +51,9 @@ class EventSource(models.Model):
    #(test connection button)
    last_update = models.CharField(max_length=128, null=True, blank=True)
 
+   def __str__(self):
+      return self.name
+
    @property
    def data(self):
       """
@@ -64,6 +67,65 @@ class EventSource(models.Model):
    def api(self):
       connector_module = importlib.import_module('event_exim.connectors.%s' % self.crm_type)
       return connector_module.Connector(self)
+
+   def update_events(self, update_since=None):
+      """
+      Sync events from source to local database
+      """
+      # 1. load events from our connector
+      if update_since is None:
+         update_since = self.last_update
+      event_data = self.api.load_events(last_updated=update_since)
+
+      all_events = {str(e['organization_source_pk']):e for e in event_data['events']}
+      new_host_ids = set([e['organization_host'].member_system_pk for e in all_events.values()])
+      existing = list(Event.objects.filter(organization_source_pk__in=all_events.keys(),
+                                           organization_source=self))
+      # 2. save hosts, new and existing Activist records
+      host_update_fields = ('hashed_email', 'email', 'name', 'phone')
+      existing_hosts = {a.member_system_pk:a
+                        for a in Activist.objects.filter(member_system=self,
+                                                         member_system_pk__in=new_host_ids)}
+      for e in all_events.values():
+         ehost = e.get('organization_host')
+         if ehost:
+            host_by_pk = existing_hosts.get(ehost.member_system_pk)
+            if host_by_pk:
+               ehost.id = host_by_pk.id
+               for hf in host_update_fields:
+                  if getattr(host_by_pk, hf) != getattr(ehost, hf):
+                     ehost.save()
+                     break #inner loop
+            else:
+               ehost.save()
+
+      # 3. bulk-create all new events not in the system yet
+      existing_ids = set([e.organization_source_pk for e in existing])
+      new_events = [Event(**e) for e in all_events.values()
+                    if e['organization_source_pk'] not in existing_ids]
+      Event.objects.bulk_create(new_events)
+
+      # 4. save any changes to existing events
+      for e in existing:
+         self.update_event(e, all_events[e.organization_source_pk])
+      # 5. now that we've updated things, save this EventSource record with last_updated
+      self.last_update = event_data['last_updated']
+      self.save()
+
+   def update_event(self, event, new_event_dict):
+      changed = False
+      for k,v in new_event_dict.items():
+         if k == 'organization_host' and event.organization_host:
+            if not event.organization_host.likely_same(v):
+               event.organization_host = v
+               changed = True
+         else:
+            if getattr(event,k) != v:
+               setattr(event,k,v)
+               changed = True
+      if changed:
+         event.save()
+      return changed
 
 
 class EventDupeGuesses(models.Model):

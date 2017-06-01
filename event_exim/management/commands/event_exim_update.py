@@ -10,18 +10,33 @@ from event_store.models import Event
 class Command(BaseCommand):
 
     def add_arguments(self, parser):
-        parser.add_argument('source', help='event source name', type=str)
+        parser.add_argument('--source',
+                            help='event source name',
+                            type=str)
+        parser.add_argument('--update_style',
+                            help="\n".join(['which event sources should be updated?',
+                                            ' 0=all manual only sources',
+                                            ' 3=daily',
+                                            ' 4=hourly',
+                                        ]),
+                            type=int)
+        parser.add_argument('--last_update',
+                            help=('Use this to override what to consider the last update.'
+                                  ' Note that this may be a different kind of value per-connector'),
+                            type=str)
 
     def handle(self, *args, **options):
+        sources = []
         source = options.get('source')
-        evtsource = EventSource.objects.get(name=source)
-        #TODO: maybe regulate updating based on argument and update_style
-        all_events = evtsource.api.load_all_events()
-        #evtsource.last_update
-        event_ids = [e.organization_source_pk for e in all_events]
-        existing = set(Event.objects.filter(
-            organization_source_pk__in=event_ids,
-            organization_source=evtsource).values_list('organization_source_pk', flat=True))
-        new_events = [e for e in all_events
-                      if e.organization_source_pk not in existing]
-        print(Event.objects.bulk_create(new_events))
+        if source:
+            sources.append(EventSource.objects.get(name=source))
+        else:
+            style = options.get('update_style')
+            if style:
+                sources = EventSource.objects.filter(update_style=style)
+        for s in sources:
+            kwargs = {}
+            if options['last_update'] is not None:
+                kwargs['last_update'] = options['last_update']
+            print('updating', s, options['last_update'] or '')
+            s.update_events(**kwargs)
