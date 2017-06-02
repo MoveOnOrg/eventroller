@@ -42,6 +42,7 @@ INSTALLED_APPS = (
     'reviewer',
     'event_exim',
     'event_review',
+    'cachalot',
 )
 
 MIDDLEWARE_CLASSES = (

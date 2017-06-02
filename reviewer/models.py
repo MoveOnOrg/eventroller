@@ -19,7 +19,10 @@ class Review(models.Model):
   modified_at = models.DateTimeField(auto_now=True)
 
   reviewer = models.ForeignKey(User)
-
+  key = models.CharField(max_length=128,
+                         help_text=("the data key for what is being reviewed"
+                                    " -- this allows multiple keys per-object"),
+                         default="review")
   decision = models.CharField(max_length=128)
 
 
