@@ -24,7 +24,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SECRET_KEY = 'l^7aj1l)+r(@9haz!_(w#8gp=u3ikl_0w$4cb89^-sb!&ur6p!'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = ('DEBUG' in os.environ)
+DEBUG = os.environ.get('DEBUG', not "PRODUCTION" in os.environ)
 
 ALLOWED_HOSTS = []
 
@@ -102,20 +102,28 @@ if 'DB_HOSTNAME' in os.environ:
 CACHALOT_UNCACHABLE_TABLES = ('events_campaign', 'events_event',)
 CACHALOT_ENABLED = False
 if 'REDISCACHE' in os.environ:
+    CACHALOT_ENABLED = True
     CACHES = {
         'default': {
             "BACKEND": "django_redis.cache.RedisCache",
             "LOCATION": os.environ['REDISCACHE'].split(','), #"redis://127.0.0.1:6379/1",
             "OPTIONS": {
-                "CLIENT_CLASS": "django_redis.client.DefaultClient",
+                "CLIENT_CLASS": os.environ.get('REDIS_CLIENT_CLASS', "django_redis.client.DefaultClient")
             },
             'KEY_PREFIX': os.environ.get('CACHE_PREFIX', ''),
         },
     }
-    if settings.DEBUG:
-        CACHES['default']['OPTIONS']["REDIS_CLIENT_CLASS"] = "fakeredis.FakeStrictRedis"
+elif DEBUG:
+    CACHES = {
+        'default': {
+            "BACKEND": "django_redis.cache.RedisCache",
+            "OPTIONS": {
+                "CLIENT_CLASS": "eventroller.fakeredis_wrapper.StupidRedis"
+            },
+            'KEY_PREFIX': os.environ.get('CACHE_PREFIX', ''),
+        },
+    }
 
-    CACHALOT_ENABLED = True
 
 EVENT_SOURCES = json.loads(os.environ.get('EVENT_SOURCES', '{}'))
 

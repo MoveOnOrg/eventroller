@@ -198,13 +198,15 @@ def current_review_state(request, organization):
         except NotImplementedError:
             #sqlite doesn't support 'DISTINCT ON' so we'll fake it
             db_res = []
-            db_pre = list(query[:100])
+            db_pre = list(query[:100]) # double
             already = set()
             for r in db_pre:
                 key = (r.content_type_id, r.object_id, r.key)
                 if key not in already:
                     db_res.append(r)
                     already.add(key)
+                    if len(db_res) > 50:
+                        break
         if not db_res:
             # no keys, so to stop db hits every time, we push an empty
             redis.lpush(itemskey, '')
