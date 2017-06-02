@@ -1,6 +1,8 @@
 from django.contrib import admin
+from django import forms
 
 from event_store.models import Event
+from huerta.filters import CollapsedListFilter
 
 @admin.register(Event)
 class EventAdmin(admin.ModelAdmin):
@@ -10,17 +12,14 @@ class EventAdmin(admin.ModelAdmin):
                     'status',
                     'organization_host',
                     'notes')
-    list_filter = ('organization_status_review',
-                   'organization_status_prep',
-                   'organization_campaign',
-                   # US district
-                   'state',
-                   'is_private',
-                   'starts_at',
-                   'ends_at',
-                   'attendee_count',
-                   # event fields
-                   'status',
-                   'host_is_confirmed'
-                   # sorting
-                   )
+    list_filter = (('organization_status_review', CollapsedListFilter),
+                   ('organization_status_prep', CollapsedListFilter),
+                   ('organization_campaign', CollapsedListFilter),
+                   ('state', CollapsedListFilter),
+                   ('is_private', CollapsedListFilter),
+                   ('starts_at', CollapsedListFilter),
+                   ('ends_at', CollapsedListFilter),
+                   ('attendee_count', CollapsedListFilter),
+                   ('status', CollapsedListFilter),
+                   ('host_is_confirmed', CollapsedListFilter))
+    list_display_links = None
