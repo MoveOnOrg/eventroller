@@ -3,6 +3,7 @@ from django import forms
 from django.utils.html import format_html, mark_safe
 
 from event_store.models import Event
+from reviewer.filters import ReviewerOrganizationFilter
 from huerta.filters import CollapsedListFilter
 
 def event_list_display(obj):
@@ -37,10 +38,12 @@ def event_list_display(obj):
 
 @admin.register(Event)
 class EventAdmin(admin.ModelAdmin):
+
     disable_list_headers = True
     list_striped = True
     list_display = (event_list_display,)
-    list_filter = (('organization_campaign', CollapsedListFilter),
+    list_filter = (ReviewerOrganizationFilter,
+                   ('organization_campaign', CollapsedListFilter),
                    ('organization_status_review', CollapsedListFilter),
                    ('organization_status_prep', CollapsedListFilter),
                    ('state', CollapsedListFilter),

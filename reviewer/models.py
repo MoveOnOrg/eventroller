@@ -8,6 +8,9 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 
 from event_store.models import Organization
 
+
+_ORGANIZATIONS = {}  # by slug
+
 class ReviewGroup(models.Model):
   """
   many-to-many link of what groups can review for what organizations
@@ -21,6 +24,20 @@ class ReviewGroup(models.Model):
   organization = models.ForeignKey(Organization, db_index=True)
   group = models.ForeignKey(Group, db_index=True)
 
+
+  @classmethod
+  def org_groups(cls, organization_slug):
+    """
+    memo-ize orgs--it'll be a long time before we're too big for memory
+    """
+    if organization_slug not in _ORGANIZATIONS:
+        _ORGANIZATIONS[organization_slug] = list(ReviewGroup.objects.filter(
+            organization__slug=organization_slug))
+    return _ORGANIZATIONS.get(organization_slug)
+
+  @classmethod
+  def user_review_groups(cls, user):
+    return ReviewGroup.objects.filter(group__user=user)
 
 class Review(models.Model):
   content_type = models.ForeignKey(ContentType,

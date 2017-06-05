@@ -1,4 +1,5 @@
-from django.conf.urls import include, url
+from django.conf import settings
+from django.conf.urls import include, static, url
 from django.contrib import admin
 
 urlpatterns = [
@@ -9,3 +10,6 @@ urlpatterns = [
     url(r'^admin/', include(admin.site.urls)),
     url(r'^review/', include('reviewer.urls')),
 ]
+
+if settings.DEBUG:
+    urlpatterns = urlpatterns + static.static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
