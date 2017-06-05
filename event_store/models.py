@@ -7,10 +7,13 @@ from django.contrib.postgres.fields import JSONField
 
 class Organization(models.Model):
     title = models.CharField(max_length=765)
-    facebook = models.CharField(max_length=128)
-    twitter = models.CharField(max_length=128, help_text="do not include @")
+    slug = models.SlugField(max_length=128, db_index=True)
     url = models.URLField(blank=True)
-    slug = models.CharField(max_length=128)
+
+    facebook = models.CharField(max_length=128, null=True, blank=True)
+    twitter = models.CharField(max_length=128,
+                               null=True, blank=True,
+                               help_text="do not include @")
 
     logo_thumb = models.URLField(blank=True)
     logo_big = models.URLField(blank=True)
@@ -20,7 +23,7 @@ class Organization(models.Model):
     #default source id
     osdi_source_id = models.CharField(max_length=128)
 
-    group = models.ForeignKey(Group)
+    group = models.ForeignKey(Group, db_index=True)
     # for getting other folks' data; auto/re-generatable
     api_key = models.CharField(max_length=765, editable=False)
 
