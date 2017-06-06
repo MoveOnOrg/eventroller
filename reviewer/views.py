@@ -96,11 +96,12 @@ def get_review_history(request, organization):
     reviewskey = '{}_reviews'.format(organization)
 
     content_type_id = int(request.GET.get('type'))
+    ct = ContentType.objects.get_for_id(content_type_id) # confirm existance
     pks = request.GET.get('pks').split(',')
     getlogs = request.GET.get('logs')
 
     pk_keys = ['{}_{}'.format(content_type_id, pk) for pk in pks]
-    reviews = redis.hmget(reviewskey, *pk_keys)
+    cached_reviews = redis.hmget(reviewskey, *pk_keys)
     logs = []
     if getlogs:
         for pk in pks:
@@ -116,11 +117,22 @@ def get_review_history(request, organization):
                          ).order_by('-id').values_list('reviewer__first_name',
                                                        'message',
                                                        'created_at')]})
-    #TODO: if None, then we need to get it from Event.review_data()
-    return HttpResponse("""{"reviews":[%s],"logs":[%s]}""" % (
-        ','.join([(o.encode('utf-8') if o else 'null') for o in reviews]),
-        json.dumps(logs)
-    ), content_type='application/json')
+    reviews = []
+    for i,r in enumerate(cached_reviews):
+        if r is not None:
+            reviews.append(r.decode('utf-8'))
+        else: # no cached version yet
+            pk = pks[i]
+            obj = ct.get_object_for_this_type(pk=pk)
+            objrev = getattr(obj, 'review_data', lambda: {})()
+            objrev.update({'pk': pk, 'type': content_type_id})
+            obj_key = '{}_{}'.format(content_type_id, pk)
+            json_str = json.dumps(objrev)
+            redis.hset(reviewskey, obj_key, json_str)
+            reviews.append(json_str)
+    return HttpResponse(
+        """{"reviews":[%s],"logs":[%s]}""" % (','.join(reviews), json.dumps(logs)),
+        content_type='application/json')
 
 
 @reviewgroup_auth

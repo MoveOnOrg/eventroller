@@ -74,7 +74,7 @@ Reviewer.prototype = {
     var $ = this.opt.jQuery;
     var pk = $(widget).attr('data-pk');
     if (!(this.state[pk])) {
-      this.state[pk] = {'o': widget, 'data': null};
+      this.state[pk] = {'pk': pk, 'o': widget, 'data': null};
     }
   },
   updateMissingData: function(callback) {
@@ -88,7 +88,6 @@ Reviewer.prototype = {
   },
   loadMissingData: function(pks, callback) {
     var self = this;
-    console.log(this, this.opt);
     this.$.getJSON(this.opt.apiPath + '/history/' + this.opt.organization
                    + '/?logs=1&type=' + this.opt.contentType + '&pks=' + pks.join(','))
       .then(function(data) {
@@ -131,7 +130,7 @@ Reviewer.prototype = {
       var obj = this.state[a];
       if (obj.o) {
         obj.o.innerHTML = this.render(obj);
-        this.postRender(obj.o);
+        this.postRender(obj);
       }
     }
   },
@@ -145,7 +144,7 @@ Reviewer.prototype = {
               return self.renderDecisions(schema, obj)
             }).join('')
             + '<label>Log</label><input type="text" />'
-            + '<button>Save</button>'
+            + '<button class="save">Save</button>'
             + this.renderLog(obj)
             + '</div>'
            )
@@ -154,20 +153,24 @@ Reviewer.prototype = {
   renderDecisions: function(schema, obj) {
     var prefix = this.prefix;
     var name = schema.name;
-    console.log(schema);
     return (''
             + '<div><label>'+schema.label+'</label>'
             + '<select class="review-select-'+name+'" data-pk="'+obj.pk+'" name="'+prefix+name+'_'+obj.pk+'">'
             + schema.choices.map(function(o) {
-              return '<option '+(obj[name]==o[0]?'selected':'')+' value="'+o[0]+'">'+o[1]+'</option>';
+              return '<option '+(obj.data[name]==o[0]?'selected="selected"':'')+' value="'+o[0]+'">'+o[1]+'</option>';
             }).join('')
             + '</select></div>');
   },
   renderFocus: function(){return '<div>focus</div>'},
-  postRender: function(widget) {
-    var $ = this.opt.jQuery;
-    //setup listeners:
-    //* onchange/focus: mark attention
-    //* save: saveDecision
+  postRender: function(obj) {
+    var $ = this.$;
+    var self = this;
+    $('button.save', obj.o).on('click', function(evt) {
+      evt.preventDefault(); //disable submitting page
+      //TODO: save log+review
+    });
+    $('input,select', obj.o).on('click mousedown focus', function(evt) {
+      //TODO: mark attention if different pk
+    });
   }
 };
