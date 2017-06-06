@@ -7,6 +7,9 @@ from django.utils.html import format_html, conditional_escape
 from event_store.models import Organization, EVENT_REVIEW_CHOICES, EVENT_PREP_CHOICES
 from reviewer.models import ReviewGroup
 
+def review_widget(obj):
+    return format_html('<div class="review" data-pk="{}"></div>', obj.id)
+
 class ReviewerOrganizationFilter(SimpleListFilter):
     template = "reviewer/admin/reviewerorganizationfilter.html"
     parameter_name = "org"
@@ -29,16 +32,14 @@ class ReviewerOrganizationFilter(SimpleListFilter):
             return Organization.objects.filter(id=val).first().slug
 
     def review_schema_json(self):
-        return json.dumps({
-            'review_status': {
-                'choices': EVENT_REVIEW_CHOICES,
-                'label': 'Review Status',
-            },
-            'prep_status': {
-                'choices': EVENT_PREP_CHOICES,
-                'label': 'Prep Status',
-            }
-        })
+        return json.dumps([
+            {'name': 'review_status',
+             'choices': EVENT_REVIEW_CHOICES,
+             'label': 'Review Status'},
+            {'name': 'prep_status',
+             'choices': EVENT_PREP_CHOICES,
+             'label': 'Prep Status'},
+        ])
 
     def lookups(self, request, model_admin):
         # we need this to save the right content type with the review api

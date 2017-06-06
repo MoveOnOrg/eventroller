@@ -74,7 +74,10 @@ def save_review(request, organization, content_type):
                                          organization_id=org[0].organization_id,
                                          reviewer=request.user,
                                          message=log_message)
-            # 2. save to redis
+            # 2. signal to obj
+            if callable(getattr(obj, 'on_save_review', None)):
+                obj.on_save_review(reviews, log_message)
+            # 3. save to redis
             json_obj = {"type": ct.id, "pk": obj.id}
             json_obj.update(decisions)
             json_str = json.dumps(json_obj)
@@ -113,8 +116,9 @@ def get_review_history(request, organization):
                          ).order_by('-id').values_list('reviewer__first_name',
                                                        'message',
                                                        'created_at')]})
+    #TODO: if None, then we need to get it from Event.review_data()
     return HttpResponse("""{"reviews":[%s],"logs":[%s]}""" % (
-        ','.join([o.encode('utf-8') for o in reviews]),
+        ','.join([(o.encode('utf-8') if o else 'null') for o in reviews]),
         json.dumps(logs)
     ), content_type='application/json')
 

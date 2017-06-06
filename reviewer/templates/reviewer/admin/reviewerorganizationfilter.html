@@ -12,10 +12,10 @@
 {% else %}
   {# chosen, or just one option #}
 <script>
- var reviewState = new Reviewer({organization: "{{spec.get_slug}}",
-                                 schema:'{{spec.review_schema_json|safe}}',
-                                 content_type: {{spec.content_type.id}},
-                                });
- 
+  var reviewState = (new Reviewer({organization: "{{spec.get_slug}}",
+                                   schema: {{spec.review_schema_json|safe}},
+                                   contentType: {{spec.content_type.id}},
+                                   jQuery: window.jQuery || django.jQuery
+                                  })).run();
 </script>
 {% endif %}
