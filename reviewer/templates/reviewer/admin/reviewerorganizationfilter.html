@@ -1,0 +1,21 @@
+{% load static %}
+<script src="{% static 'js/reviewer.js' %}"></script>
+
+{% if not spec.value %}
+  {# need to offer options #}
+  <label>Review for</label>
+  <ul>
+    {% for c in choices %}
+    <li><a href="{{c.query_string|iriencode}}">{{c.display}}</a>{% if c.selected %} (current){% endif %}</li>
+    {% endfor %}
+  </ul>
+{% else %}
+  {# chosen, or just one option #}
+<script>
+  var reviewState = (new Reviewer({organization: "{{spec.get_slug}}",
+                                   schema: {{spec.review_schema_json|safe}},
+                                   contentType: {{spec.content_type.id}},
+                                   jQuery: window.jQuery || django.jQuery
+                                  })).run();
+</script>
+{% endif %}

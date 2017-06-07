@@ -203,3 +203,37 @@ class Event(models.Model):
 
     def handle_rsvp(self):
         return None #organization can implement
+
+    def review_data(self):
+        return {
+            'review_status': self.organization_status_review,
+            'prep_status': self.organization_status_prep,
+        }
+
+    def on_save_review(self, reviews, log_message=None):
+        """
+        Upon review saving, it will call this method, which allows us to update
+        through the EventSource.
+        I know, I know -- signals are awesome, but this is a little less magical
+        and I don't want events to have to 'know' about the reviewer app.
+        """
+        src = self.organization_source
+        if src and src.allows_updates:
+            connector = src.api
+            if connector and hasattr(connector, 'update_review'):
+                try:
+                    connector.update_review(self, reviews, log_message)
+                except:
+                    # TODO: log this?
+                    pass # we still want to save locally, no matter what the api does
+        reviewkeys = {
+            'prep_status': 'organization_status_prep',
+            'review_status': 'organization_status_review'
+        }
+        changed = False
+        for r in reviews:
+            if r.key in reviewkeys:
+                setattr(self, reviewkeys[r.key], r.decision)
+                changed = True
+        if changed:
+            self.save()

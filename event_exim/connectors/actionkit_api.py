@@ -1,4 +1,5 @@
 import datetime
+from itertools import chain
 import re
 
 from actionkit.api.event import AKEventAPI
@@ -61,7 +62,12 @@ class Connector:
                     'needs_organizer_help', 'political_scope', 'public_phone', 'venue_category']
 
     #column indexes for the above fields
-    field_indexes = {k:i for i,k in enumerate(common_fields + other_fields + event_fields)}
+    field_indexes = {k:i for i,k in enumerate(
+        common_fields
+        + other_fields
+        # this looks complicated, but just alternates between <field>, <field>_id for the eventfield id
+        + list(chain(*[(ef,'%s_id' % ef) for ef in event_fields]))
+    )}
 
     sql_query = (
         "SELECT %(commonfields)s, %(otherfields)s, %(eventfields)s"
@@ -83,7 +89,7 @@ class Connector:
         " OFFSET {{ offset }}"
     ) % {'commonfields': ','.join(['ee.{}'.format(f) for f in common_fields]),
          'otherfields': ','.join(other_fields),
-         'eventfields': ','.join(['{f}.value'.format(f=f) for f in event_fields]),
+         'eventfields': ','.join(['{f}.value, {f}.id'.format(f=f) for f in event_fields]),
          'eventjoins': ' '.join([("LEFT JOIN events_eventfield {f}"
                                   " ON ({f}.parent_id=ee.id AND {f}.name = '{f}')"
                               ).format(f=f) for f in event_fields]),
@@ -254,8 +260,16 @@ class Connector:
         return {'events': all_events,
                 'last_updated': datetime.datetime.utcnow().strftime(DATE_FMT)}
 
-    def update_review(self, review):
-        pass
+    def update_review(self, event, reviews):
+        res = self.akapi.get_event(event.organization_source_pk)
+        if 'res' in res:
+            eventfield_list = res['res'].json().get('fields', {})
+            eventfields = {ef['name']:ef['id'] for ef in eventfield_list}
+            for r in reviews:
+                if r.key in ('review_status', 'prep_status'):
+                    self.akapi.set_event_field(event.organization_source_pk,
+                                               r.key, r.decision,
+                                               eventfield_id=eventfields.get(r.key))
 
     def get_host_event_link(self, event):
         #might include a temporary token

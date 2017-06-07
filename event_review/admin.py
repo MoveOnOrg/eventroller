@@ -3,6 +3,7 @@ from django import forms
 from django.utils.html import format_html, mark_safe
 
 from event_store.models import Event
+from reviewer.filters import ReviewerOrganizationFilter, review_widget
 from huerta.filters import CollapsedListFilter
 
 def event_list_display(obj):
@@ -16,10 +17,8 @@ def event_list_display(obj):
                 <div><b>Description</b> {description}</div>
             </div>
             <div class="col-md-6">
-                <div><b>Review Status:</b> {review_status}</div>
-                <div><b>Prep Status:</b> {prep_status}</div>
-                <div><b>Active Status:</b> {active_status}</div>
-                <div><b>Notes:</b> {notes}</div>
+                <div><b>Event Status:</b> {active_status}</div>
+                {review_widget}
             </div>
         </div>
         """,
@@ -27,20 +26,23 @@ def event_list_display(obj):
         venue=obj.venue,
         private=mark_safe('<div class="alert alert-danger">Private</div>') if obj.is_private else '',
         host=obj.organization_host,
-        review_status=obj.organization_status_review,
-        prep_status=obj.organization_status_prep,
+        #review_status=obj.organization_status_review,
+        #prep_status=obj.organization_status_prep,
         active_status=obj.status,
-        notes=mark_safe('<textarea rows="5" class="form-control" readonly>%s</textarea>' % obj.notes)
-            if obj.notes else None,
+        review_widget=review_widget(obj),
+        #notes=mark_safe('<textarea rows="5" class="form-control" readonly>%s</textarea>' % obj.notes)
+        #    if obj.notes else None,
         description = mark_safe('<textarea rows="5" class="form-control" readonly>%s</textarea>' % obj.public_description)
             if obj.public_description else None)
 
 @admin.register(Event)
 class EventAdmin(admin.ModelAdmin):
+
     disable_list_headers = True
     list_striped = True
     list_display = (event_list_display,)
-    list_filter = (('organization_campaign', CollapsedListFilter),
+    list_filter = (ReviewerOrganizationFilter,
+                   ('organization_campaign', CollapsedListFilter),
                    ('organization_status_review', CollapsedListFilter),
                    ('organization_status_prep', CollapsedListFilter),
                    ('state', CollapsedListFilter),
