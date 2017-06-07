@@ -4,7 +4,7 @@
   * init with:
     - current organization
     - content type
-    - api_path (default='/review')
+    - api path (default='/review')
     - css selector to search (default='.review')
     - dict of review fields/options (default=<see current>)
   * get ids from current dom
@@ -17,7 +17,8 @@
  */
 function Reviewer(opts) {
   this.state = {}; //keyed by object_id; has pointers to dom, and current values
-  this.focus = null; //key of object
+  this.focus = null; //key of object for current user's focus
+  this.lastUpdate = 0;
   this.prefix = 'reviewer_'+parseInt(Math.random()*100) + '_';
   this.opt = {
     jQuery: window.jQuery,
@@ -25,6 +26,7 @@ function Reviewer(opts) {
     contentType: null,
     apiPath: '/review',
     cssSelector: '.review', //expects data-pk and data-type
+    pollRate: 15, //number of seconds between polling for updates (0 means never)
     schema: [
       {'name': 'review_status',
        'choices':[ ['unknown', 'unreviewed'],
@@ -50,11 +52,13 @@ Reviewer.prototype = {
     }
     var $ = this.$ = this.opt.jQuery;
   },
-  run: function() {
+  start: function() {
     this.initReviewWidgets();
     this.updateMissingData(this.initRenderAll);
-    // 2. render the data/initialize the widget
-    //2. start polling
+    var poll = this.opt.pollRate;
+    if (poll) {
+      setInterval(this.pollState, poll * 1000);
+    }
     return this;
   },
   saveDecision: function(evt) {
@@ -84,9 +88,9 @@ Reviewer.prototype = {
         newPks.push(a);
       }
     }
-    this.loadMissingData(newPks, callback);
+    this.loadReviewData(newPks, callback);
   },
-  loadMissingData: function(pks, callback) {
+  loadReviewData: function(pks, callback) {
     var self = this;
     this.$.getJSON(this.opt.apiPath + '/history/' + this.opt.organization
                    + '/?logs=1&type=' + this.opt.contentType + '&pks=' + pks.join(','))
@@ -118,12 +122,94 @@ Reviewer.prototype = {
         }
       });
   },
+  postFocus: function(pk, callback) {
+    var opt = this.opt;
+    this.$.ajax({
+      'url': (opt.apiPath + '/focus/' + [opt.organization, opt.contentType, pk, ''].join('/')),
+      'method': 'POST'
+    }).then(function() {
+      if (callback) {
+        callback();
+      }
+    });
+  },
+  saveReview: function(obj, log, callback) {
+    var opt = this.opt;
+    var decisions = [];
+    for (var i=0,l=opt.schema.length;i<l;i++) {
+      var name = opt.schema[i].name;
+      if (name in obj.data) {
+        decisions.push(name + ':' + obj.data[name]);
+      }
+    }
+    var csrfmiddlewaretoken = undefined;
+    if (document.forms[0] && document.forms[0]['csrfmiddlewaretoken']) {
+      csrfmiddlewaretoken = document.forms[0]['csrfmiddlewaretoken'].value;
+    }
+    this.$.ajax({
+      'url': (opt.apiPath + ['', opt.organization, opt.contentType, obj.pk, ''].join('/')),
+      'method': 'POST',
+      'data': {
+        csrfmiddlewaretoken: csrfmiddlewaretoken,
+        content_type: opt.contentType,
+        pk: obj.pk,
+        decisions: decisions.join(';'),
+        log: log
+      }
+    }).then(function() {
+      if (callback) { callback(); }
+    });
+  },
   pollState: function() {
-    //1. find pks with missing data
-    //2. get full data with state for them
-    //3. get current/
-    //   3.1: update state
-    //   3.2: update UI
+    var self = this;
+    var opt = this.opt;
+    this.$.getJSON(opt.apiPath + '/current/' + opt.organization + '/')
+      .then(function(data) {
+        var last = self.lastUpdate;
+        var newLast = 0;
+        // 1. update current focus state
+        var newFocus = {};
+        for (var i=0,l=data.focus.length; i<l; i++) {
+          // f = [<event type id>, <pk>, "<name>", <timestamp in epoch seconds>]
+          var f = data.focus[i];
+          // We don't test lastUpdate for focus because we cleared focus from before
+          if (opt.contentType == f[0] && f[1] in self.state) {
+            newFocus[f[1]] = f[2];
+          }
+        }
+        // 2. update focus dom
+        (window.requestAnimationFrame||window.setTimeout)(function() {
+          var oldFocus = self.focus;
+          self.focus = newFocus;
+          // not just update new focii, but clear old
+          for (var pk in self.state) {
+            if (pk in newFocus) {
+              if (newFocus[pk] != self.state[pk].focus) {
+                self.state[pk].focus = newFocus[pk];
+                self.renderFocusUpdate(self.state[pk]);
+              }
+            } else {
+              delete self.state[pk].focus;
+              self.renderFocusUpdate(self.state[pk]);
+            }
+          }
+        },0);
+        // 3. update objects and update dom async-ly
+        for (var i=0,l=data.reviews.length; i<l; i++) {
+          var review = data.reviews[i];
+          if (review.pk in self.state
+              && opt.contentType == review.type
+              && (!review.ts || review.ts > last)) {
+            last = Math.max(last, review.ts || 0);
+            var obj = self.state[review.pk];
+            obj.data = review;
+            (window.requestAnimationFrame||window.setTimeout)(function() {
+              self.renderDecisionsUpdate(obj);
+            },0);
+          }
+        }
+        self.lastUpdate = last;
+      });
   },
   initRenderAll: function() {
     for (var a in this.state) {
@@ -134,43 +220,118 @@ Reviewer.prototype = {
       }
     }
   },
-  //render review component for a specific field
+  //from scratch
   render: function(obj) {
     var self = this;
     return (''
             + '<div class="review-widget">'
-            + this.renderFocus()
-            + this.opt.schema.map(function(schema) {
-              return self.renderDecisions(schema, obj)
-            }).join('')
-            + '<label>Log</label><input type="text" />'
-            + '<button class="save">Save</button>'
-            + this.renderLog(obj)
+            + ' <div class="row">'
+            + '  <div class="col-md-10">'
+            +      this.opt.schema.map(function(schema) {
+                      return self.renderDecisions(schema, obj)
+                   }).join('')
+            + '    <div class="form-inline form-group">'
+            + '      <label>Log</label><input class="log form-control" type="text" />'
+            + '    </div>'
+            + '  </div>'
+            + '  <div class="review-header" style="padding-left:15px;">'
+            + '      <button class="btn btn-default btn-primary save">Save</button>'
+            + '      <span class="focus label label-info">' + this.renderFocus(obj) + '</span>'
+            + '      <span class="saved label label-success"></span>' // save status
+            + '  </div>'
+            + ' </div>'
+            + ' <div class="panel panel-default">'
+            + '  <div class="panel-heading">Logs</div>'
+            + '  <div class="logs panel-body" aria-labelledby="Logs" style="max-height:4em;overflow-y:scroll">'
+            +      this.renderLog(obj)
+            + '  </div>'
+            + ' </div>'
             + '</div>'
            )
   },
-  renderLog: function(){return '<div>Log</div>'},
+  renderSaveUpdate: function(obj) {
+    this.$('.saved', obj.o).html('saved!').show().fadeOut(2000);
+  },
+  renderLog: function(obj){
+    return ((!obj.log) ? ''
+            : obj.log.map(function(log) {
+              var d = new Date(log.ts * 1000);
+              var dateStr = d.toLocaleDateString();
+              var timeStr = d.toLocaleTimeString().replace(/:\d\d /,' ').toLowerCase();
+              var tsStr = ((dateStr == new Date().toLocaleDateString()) ? timeStr : dateStr);
+              return (''
+                      + '<div class="logitem">'
+                      + '<span class="reviewer">' + log.r + '</span>'
+                      + ' (' + tsStr + '): '
+                      + '<span class="logm">' + log.m + '</span>'
+                      + '</div>'
+                     );
+              }).join(''));
+  },
   renderDecisions: function(schema, obj) {
     var prefix = this.prefix;
     var name = schema.name;
     return (''
-            + '<div><label>'+schema.label+'</label>'
-            + '<select class="review-select-'+name+'" data-pk="'+obj.pk+'" name="'+prefix+name+'_'+obj.pk+'">'
+            + '<div class="form-group form-inline"><label>'+schema.label+'</label> '
+            + '<select class="form-control review-select-'+name+'" data-name="'+name+'" name="'+prefix+name+'_'+obj.pk+'">'
             + schema.choices.map(function(o) {
               return '<option '+(obj.data[name]==o[0]?'selected="selected"':'')+' value="'+o[0]+'">'+o[1]+'</option>';
             }).join('')
             + '</select></div>');
   },
-  renderFocus: function(){return '<div>focus</div>'},
+  renderDecisionsUpdate: function(obj) {
+    if (!obj.o) { throw "cannot call renderUpdate unless we have a dom object"; }
+    var $ = this.$;
+    this.opt.schema.map(function(schema) {
+      var val = obj.data[schema.name];
+      if (val) {
+        $('.review-select-'+schema.name, obj.o).val(val);
+      }
+    });
+  },
+  renderFocus: function(obj) {
+    return (obj.focus || '');
+  },
+  renderFocusUpdate: function(obj) {
+    this.$('.focus', obj.o).html(this.renderFocus(obj));
+  },
   postRender: function(obj) {
     var $ = this.$;
     var self = this;
-    $('button.save', obj.o).on('click', function(evt) {
-      evt.preventDefault(); //disable submitting page
-      //TODO: save log+review
+    // A. any 'attention' on a review marks attention
+    $('input,select', obj.o).on('click mousedown focus change', function(evt) {
+      if (self.focus != obj.pk) {
+        self.focus = obj.pk;
+        self.postFocus(obj.pk);
+      }
     });
-    $('input,select', obj.o).on('click mousedown focus', function(evt) {
-      //TODO: mark attention if different pk
+    // B. save button listener
+    $('button.save', obj.o).click(function(evt) {
+      evt.preventDefault(); //disable submitting page
+      // 1. get values from dom
+      var reviews = {};
+      $('select', obj.o).each(function() {
+        var name = $(this).attr('data-name');
+        var val = $(this).val();
+        reviews[name] = val;
+      });
+      var log = $('input.log', obj.o).val().replace(/^\s+/,'').replace(/\s+$/,'');
+      // 2. make sure something changed
+      var changed = Boolean(log);
+      for (var a in reviews) {
+        if (obj.data[a] != reviews[a]) {
+          obj.data[a] = reviews[a];
+          changed = true;
+        }
+      }
+      // 3. saveReview()
+      if (changed) {
+        self.saveReview(obj, log || undefined, function() {
+          // 4. on callback: add status (and clear log message)
+          self.renderSaveUpdate(obj);
+          $('input.log', obj.o).val(''); //clear
+        });
+      }
     });
   }
 };
