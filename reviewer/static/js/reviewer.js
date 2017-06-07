@@ -157,6 +157,12 @@ Reviewer.prototype = {
         log: log
       }
     }).then(function() {
+      if (log) {
+        if (!obj.log) { obj.log = []; }
+        obj.log.unshift({"m":log,
+                         "r":'<i>me</i>',
+                         "ts":parseInt(Number(new Date())/1000)})
+      }
       if (callback) { callback(); }
     });
   },
@@ -195,12 +201,14 @@ Reviewer.prototype = {
           }
         },0);
         // 3. update objects and update dom async-ly
+        var changedPks = [];
         for (var i=0,l=data.reviews.length; i<l; i++) {
           var review = data.reviews[i];
           if (review.pk in self.state
               && opt.contentType == review.type
               && (!review.ts || review.ts > last)) {
             last = Math.max(last, review.ts || 0);
+            changedPks.push(review.pk);
             var obj = self.state[review.pk];
             obj.data = review;
             (window.requestAnimationFrame||window.setTimeout)(function() {
@@ -209,6 +217,14 @@ Reviewer.prototype = {
           }
         }
         self.lastUpdate = last;
+        // 4. update possible log additions
+        self.loadReviewData(changedPks, function() {
+            (window.requestAnimationFrame||window.setTimeout)(function() {
+              for (var i=0,l=changedPks.length; i<l; i++) {
+                self.renderLogUpdate(self.state[changedPks[i]]);
+              }
+            },0);
+        });
       });
   },
   initRenderAll: function() {
@@ -252,7 +268,7 @@ Reviewer.prototype = {
   renderSaveUpdate: function(obj) {
     this.$('.saved', obj.o).html('saved!').show().fadeOut(2000);
   },
-  renderLog: function(obj){
+  renderLog: function(obj) {
     return ((!obj.log) ? ''
             : obj.log.map(function(log) {
               var d = new Date(log.ts * 1000);
@@ -267,6 +283,9 @@ Reviewer.prototype = {
                       + '</div>'
                      );
               }).join(''));
+  },
+  renderLogUpdate: function(obj) {
+    this.$('.logs', obj.o).html(this.renderLog(obj));
   },
   renderDecisions: function(schema, obj) {
     var prefix = this.prefix;
@@ -329,6 +348,7 @@ Reviewer.prototype = {
         self.saveReview(obj, log || undefined, function() {
           // 4. on callback: add status (and clear log message)
           self.renderSaveUpdate(obj);
+          self.renderLogUpdate(obj);
           $('input.log', obj.o).val(''); //clear
         });
       }
