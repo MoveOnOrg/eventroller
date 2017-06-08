@@ -7,7 +7,7 @@ git+https://github.com/MoveOnOrg/huerta.git@master#egg=huerta
 -e git+https://github.com/MoveOnOrg/python-actionkit.git@public-master#egg=python-actionkit
 
 mysqlclient==1.3.7
-psycopg2==2.6.2
+psycopg2==2.7.1
 
 requests[security]==2.11.1
 six==1.10.0
