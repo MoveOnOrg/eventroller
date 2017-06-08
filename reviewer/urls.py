@@ -10,4 +10,6 @@ urlpatterns = [
         name='reviewer_visit'),
     url(r'^(?P<organization>[-.\w]+)/(?P<content_type>\w+)/(?P<pk>\w+)/?$', views.save_review,
         name='reviewer_save'),
+    url(r'^$', views.base,
+        name='reviewer_base'),
 ]

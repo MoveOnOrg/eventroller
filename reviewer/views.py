@@ -52,6 +52,10 @@ def reviewgroup_auth(view_func):
     return wrapped
 
 @reviewgroup_auth
+def base(request):
+    return HttpResponse("ok")
+
+@reviewgroup_auth
 def save_review(request, organization, content_type, pk):
     # save a review
     redis = get_redis_connection(REDIS_CACHE_KEY)
@@ -146,7 +150,7 @@ def get_review_history(request, organization):
                 organization_id=org[0].organization_id
             )
             if dbreview:
-                objrev.update(dbreview((content_type_id, pk)))
+                objrev.update(dbreview[(int(content_type_id), int(pk))])
             else:
                 obj = ct.get_object_for_this_type(pk=pk)
                 objrev.update(getattr(obj, 'review_data', lambda: {})())
