@@ -15,6 +15,6 @@ setup(
     description="Event aggregator and manager across event CRMs/websites used in progressive politics",
     long_description=textwrap.dedent(open('README.md', 'r').read()),
     install_requires=reqs,
-    keywords = "python actionkit",
+    keywords = "python events actionkit",
     classifiers=['Development Status :: 4 - Beta', 'Environment :: Console', 'Intended Audience :: Developers', 'Natural Language :: English', 'Operating System :: OS Independent', 'Topic :: Internet :: WWW/HTTP'],
 )

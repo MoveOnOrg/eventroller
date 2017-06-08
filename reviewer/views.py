@@ -1,4 +1,3 @@
-from collections import OrderedDict
 import datetime
 import json
 import time
@@ -105,24 +104,28 @@ def get_review_history(request, organization):
 
     content_type_id = int(request.GET.get('type'))
     ct = ContentType.objects.get_for_id(content_type_id) # confirm existance
-    pks = request.GET.get('pks').split(',')
+    pks = [pk for pk in request.GET.get('pks').split(',') if pk]
     getlogs = request.GET.get('logs')
-
     pk_keys = ['{}_{}'.format(content_type_id, pk) for pk in pks]
-    cached_reviews = redis.hmget(reviewskey, *pk_keys)
+    cached_reviews = []
+    if pk_keys:
+        cached_reviews = redis.hmget(reviewskey, *pk_keys)
     logs = []
     if getlogs:
         for pk in pks:
+            if not pk:
+                continue
             review_logs = ReviewLog.objects.filter(
                              organization__slug=organization,
                              content_type_id=content_type_id,
                              object_id=int(pk)
                          ).order_by('-id').values('reviewer__first_name',
+                                                  'reviewer__last_name',
                                                   'message',
                                                   'created_at')
             logs.append({"pk": pk, 'type': content_type_id,
                          "m": [{
-                             'r': r['reviewer__first_name'],
+                             'r': '{} {}'.format(r['reviewer__first_name'],r['reviewer__last_name'][:1]),
                              'm': r['message'],
                              'ts': int(time.mktime(r['created_at'].timetuple()))
                          } for r in review_logs]})
@@ -132,11 +135,19 @@ def get_review_history(request, organization):
             reviews.append(r.decode('utf-8'))
         else: # no cached version yet
             pk = pks[i]
-            obj = ct.get_object_for_this_type(pk=pk)
-            # TODO: also look for review model
-            #       if review model exists, include time stamp
-            objrev = getattr(obj, 'review_data', lambda: {})()
-            objrev.update({'pk': pk, 'type': content_type_id})
+            objrev = {'pk': pk, 'type': content_type_id}
+            org = ReviewGroup.org_groups(organization)
+            dbreview = Review.reviews_by_object(
+                content_type_id=content_type_id,
+                object_id=pk,
+                organization_id=org[0].organization_id
+            )
+            if dbreview:
+                objrev.update(dbreview((content_type_id, pk)))
+            else:
+                obj = ct.get_object_for_this_type(pk=pk)
+                objrev.update(getattr(obj, 'review_data', lambda: {})())
+
             obj_key = '{}_{}'.format(content_type_id, pk)
             json_str = json.dumps(objrev)
             redis.hset(reviewskey, obj_key, json_str)
@@ -205,38 +216,17 @@ def current_review_state(request, organization):
     items = redis.lrange(itemskey, 0, num_items)
     focus = redis.hgetall('{}_focus'.format(organization)).values()
     if not items:
-        # TODO: get them from db and save them to redis
-        # if no items in db, then lpush empty string to items
         org = ReviewGroup.org_groups(organization)
         if not org:
             return HttpResponseForbidden('nope')
         #maybe just get most recent review for each object
-        query = Review.objects.filter(organization_id=org[0].organization_id).order_by('-id')
-        try:
-            db_res = list(query.distinct('content_type', 'object_id', 'key')[:QUEUE_SIZE])
-        except NotImplementedError:
-            #sqlite doesn't support 'DISTINCT ON' so we'll fake it
-            db_res = []
-            db_pre = list(query[:100]) # double
-            already = set()
-            for r in db_pre:
-                key = (r.content_type_id, r.object_id, r.key)
-                if key not in already:
-                    db_res.append(r)
-                    already.add(key)
-                    if len(db_res) > QUEUE_SIZE:
-                        break
-        if not db_res:
+        reviews = Review.reviews_by_object(max=QUEUE_SIZE,
+                                           organization_id=org[0].organization_id)
+        if not reviews:
             # no keys, so to stop db hits every time, we push an empty
             redis.lpush(itemskey, '')
         else:
-            revs = OrderedDict()
-            for rev in db_res:
-                revs.setdefault(
-                    (rev.content_type_id, rev.object_id),
-                    {'type': rev.content_type_id,
-                     'pk': rev.object_id}).update({rev.key: rev.decision})
-            json_revs = [json.dumps(r) for r in revs.values()]
+            json_revs = [json.dumps(r) for r in reviews.values()]
             redis.lpush(itemskey, *json_revs)
     else:
         if items[-1] == b'':

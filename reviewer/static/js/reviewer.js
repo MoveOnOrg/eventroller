@@ -133,13 +133,13 @@ Reviewer.prototype = {
       }
     });
   },
-  saveReview: function(obj, log, callback) {
+  saveReview: function(reviewSubject, log, callback) {
     var opt = this.opt;
     var decisions = [];
     for (var i=0,l=opt.schema.length;i<l;i++) {
       var name = opt.schema[i].name;
-      if (name in obj.data) {
-        decisions.push(name + ':' + obj.data[name]);
+      if (name in reviewSubject.data) {
+        decisions.push(name + ':' + reviewSubject.data[name]);
       }
     }
     var csrfmiddlewaretoken = undefined;
@@ -147,19 +147,19 @@ Reviewer.prototype = {
       csrfmiddlewaretoken = document.forms[0]['csrfmiddlewaretoken'].value;
     }
     this.$.ajax({
-      'url': (opt.apiPath + ['', opt.organization, opt.contentType, obj.pk, ''].join('/')),
+      'url': (opt.apiPath + ['', opt.organization, opt.contentType, reviewSubject.pk, ''].join('/')),
       'method': 'POST',
       'data': {
         csrfmiddlewaretoken: csrfmiddlewaretoken,
         content_type: opt.contentType,
-        pk: obj.pk,
+        pk: reviewSubject.pk,
         decisions: decisions.join(';'),
         log: log
       }
     }).then(function() {
       if (log) {
-        if (!obj.log) { obj.log = []; }
-        obj.log.unshift({"m":log,
+        if (!reviewSubject.log) { reviewSubject.log = []; }
+        reviewSubject.log.unshift({"m":log,
                          "r":'<i>me</i>',
                          "ts":parseInt(Number(new Date())/1000)})
       }
@@ -209,42 +209,44 @@ Reviewer.prototype = {
               && (!review.ts || review.ts > last)) {
             last = Math.max(last, review.ts || 0);
             changedPks.push(review.pk);
-            var obj = self.state[review.pk];
-            obj.data = review;
+            var reviewSubject = self.state[review.pk];
+            reviewSubject.data = review;
             (window.requestAnimationFrame||window.setTimeout)(function() {
-              self.renderDecisionsUpdate(obj);
+              self.renderDecisionsUpdate(reviewSubject);
             },0);
           }
         }
         self.lastUpdate = last;
         // 4. update possible log additions
-        self.loadReviewData(changedPks, function() {
+        if (changedPks.length) {
+          self.loadReviewData(changedPks, function() {
             (window.requestAnimationFrame||window.setTimeout)(function() {
               for (var i=0,l=changedPks.length; i<l; i++) {
                 self.renderLogUpdate(self.state[changedPks[i]]);
               }
             },0);
-        });
+          });
+        }
       });
   },
   initRenderAll: function() {
     for (var a in this.state) {
-      var obj = this.state[a];
-      if (obj.o) {
-        obj.o.innerHTML = this.render(obj);
-        this.postRender(obj);
+      var reviewSubject = this.state[a];
+      if (reviewSubject.o) {
+        reviewSubject.o.innerHTML = this.render(reviewSubject);
+        this.postRender(reviewSubject);
       }
     }
   },
   //from scratch
-  render: function(obj) {
+  render: function(reviewSubject) {
     var self = this;
     return (''
             + '<div class="review-widget">'
             + ' <div class="row">'
             + '  <div class="col-md-10">'
             +      this.opt.schema.map(function(schema) {
-                      return self.renderDecisions(schema, obj)
+                      return self.renderDecisions(schema, reviewSubject)
                    }).join('')
             + '    <div class="form-inline form-group">'
             + '      <label>Log</label><input class="log form-control" type="text" />'
@@ -252,25 +254,25 @@ Reviewer.prototype = {
             + '  </div>'
             + '  <div class="review-header" style="padding-left:15px;">'
             + '      <button class="btn btn-default btn-primary save">Save</button>'
-            + '      <span class="focus label label-info">' + this.renderFocus(obj) + '</span>'
+            + '      <span class="focus label label-info">' + this.renderFocus(reviewSubject) + '</span>'
             + '      <span class="saved label label-success"></span>' // save status
             + '  </div>'
             + ' </div>'
             + ' <div class="panel panel-default">'
             + '  <div class="panel-heading">Logs</div>'
             + '  <div class="logs panel-body" aria-labelledby="Logs" style="max-height:4em;overflow-y:scroll">'
-            +      this.renderLog(obj)
+            +      this.renderLog(reviewSubject)
             + '  </div>'
             + ' </div>'
             + '</div>'
            )
   },
-  renderSaveUpdate: function(obj) {
-    this.$('.saved', obj.o).html('saved!').show().fadeOut(2000);
+  renderSaveUpdate: function(reviewSubject) {
+    this.$('.saved', reviewSubject.o).html('saved!').show().fadeOut(2000);
   },
-  renderLog: function(obj) {
-    return ((!obj.log) ? ''
-            : obj.log.map(function(log) {
+  renderLog: function(reviewSubject) {
+    return ((!reviewSubject.log) ? ''
+            : reviewSubject.log.map(function(log) {
               var d = new Date(log.ts * 1000);
               var dateStr = d.toLocaleDateString();
               var timeStr = d.toLocaleTimeString().replace(/:\d\d /,' ').toLowerCase();
@@ -284,72 +286,72 @@ Reviewer.prototype = {
                      );
               }).join(''));
   },
-  renderLogUpdate: function(obj) {
-    this.$('.logs', obj.o).html(this.renderLog(obj));
+  renderLogUpdate: function(reviewSubject) {
+    this.$('.logs', reviewSubject.o).html(this.renderLog(reviewSubject));
   },
-  renderDecisions: function(schema, obj) {
+  renderDecisions: function(schema, reviewSubject) {
     var prefix = this.prefix;
     var name = schema.name;
     return (''
             + '<div class="form-group form-inline"><label>'+schema.label+'</label> '
-            + '<select class="form-control review-select-'+name+'" data-name="'+name+'" name="'+prefix+name+'_'+obj.pk+'">'
+            + '<select class="form-control review-select-'+name+'" data-name="'+name+'" name="'+prefix+name+'_'+reviewSubject.pk+'">'
             + schema.choices.map(function(o) {
-              return '<option '+(obj.data[name]==o[0]?'selected="selected"':'')+' value="'+o[0]+'">'+o[1]+'</option>';
+              return '<option '+(reviewSubject.data[name]==o[0]?'selected="selected"':'')+' value="'+o[0]+'">'+o[1]+'</option>';
             }).join('')
             + '</select></div>');
   },
-  renderDecisionsUpdate: function(obj) {
-    if (!obj.o) { throw "cannot call renderUpdate unless we have a dom object"; }
+  renderDecisionsUpdate: function(reviewSubject) {
+    if (!reviewSubject.o) { throw "cannot call renderUpdate unless we have a dom object"; }
     var $ = this.$;
     this.opt.schema.map(function(schema) {
-      var val = obj.data[schema.name];
+      var val = reviewSubject.data[schema.name];
       if (val) {
-        $('.review-select-'+schema.name, obj.o).val(val);
+        $('.review-select-'+schema.name, reviewSubject.o).val(val);
       }
     });
   },
-  renderFocus: function(obj) {
-    return (obj.focus || '');
+  renderFocus: function(reviewSubject) {
+    return (reviewSubject.focus || '');
   },
-  renderFocusUpdate: function(obj) {
-    this.$('.focus', obj.o).html(this.renderFocus(obj));
+  renderFocusUpdate: function(reviewSubject) {
+    this.$('.focus', reviewSubject.o).html(this.renderFocus(reviewSubject));
   },
-  postRender: function(obj) {
+  postRender: function(reviewSubject) {
     var $ = this.$;
     var self = this;
     // A. any 'attention' on a review marks attention
-    $('input,select', obj.o).on('click mousedown focus change', function(evt) {
-      if (self.focus != obj.pk) {
-        self.focus = obj.pk;
-        self.postFocus(obj.pk);
+    $('input,select', reviewSubject.o).on('click mousedown focus change', function(evt) {
+      if (self.focus != reviewSubject.pk) {
+        self.focus = reviewSubject.pk;
+        self.postFocus(reviewSubject.pk);
       }
     });
     // B. save button listener
-    $('button.save', obj.o).click(function(evt) {
+    $('button.save', reviewSubject.o).click(function(evt) {
       evt.preventDefault(); //disable submitting page
       // 1. get values from dom
       var reviews = {};
-      $('select', obj.o).each(function() {
+      $('select', reviewSubject.o).each(function() {
         var name = $(this).attr('data-name');
         var val = $(this).val();
         reviews[name] = val;
       });
-      var log = $('input.log', obj.o).val().replace(/^\s+/,'').replace(/\s+$/,'');
+      var log = $('input.log', reviewSubject.o).val().replace(/^\s+/,'').replace(/\s+$/,'');
       // 2. make sure something changed
       var changed = Boolean(log);
       for (var a in reviews) {
-        if (obj.data[a] != reviews[a]) {
-          obj.data[a] = reviews[a];
+        if (reviewSubject.data[a] != reviews[a]) {
+          reviewSubject.data[a] = reviews[a];
           changed = true;
         }
       }
       // 3. saveReview()
       if (changed) {
-        self.saveReview(obj, log || undefined, function() {
+        self.saveReview(reviewSubject, log || undefined, function() {
           // 4. on callback: add status (and clear log message)
-          self.renderSaveUpdate(obj);
-          self.renderLogUpdate(obj);
-          $('input.log', obj.o).val(''); //clear
+          self.renderSaveUpdate(reviewSubject);
+          self.renderLogUpdate(reviewSubject);
+          $('input.log', reviewSubject.o).val(''); //clear
         });
       }
     });
