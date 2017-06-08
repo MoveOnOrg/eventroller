@@ -9,6 +9,7 @@ urlpatterns = [
 
     url(r'^admin/', include(admin.site.urls)),
     url(r'^review/', include('reviewer.urls')),
+    url('^', include('django.contrib.auth.urls')),
 ]
 
 if settings.DEBUG:
