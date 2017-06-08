@@ -1,5 +1,6 @@
 import json
 
+from django.conf import settings
 from django.contrib.admin.filters import SimpleListFilter
 from django.contrib.contenttypes.models import ContentType
 from django.utils.html import format_html, conditional_escape
@@ -16,6 +17,11 @@ class ReviewerOrganizationFilter(SimpleListFilter):
     title = "Organization"
 
     fieldname = 'organization'
+
+    @property
+    def poll_rate(self):
+        """number of seconds that poll rate should update"""
+        return getattr(settings, 'REVIEW_POLL_RATE', 15)
 
     def value(self):
         """

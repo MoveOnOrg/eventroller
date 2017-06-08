@@ -15,7 +15,8 @@
   var reviewState = (new Reviewer({organization: "{{spec.get_slug}}",
                                    schema: {{spec.review_schema_json|safe}},
                                    contentType: {{spec.content_type.id}},
-                                   jQuery: window.jQuery || django.jQuery
-                                  })).run();
+                                   jQuery: window.jQuery || django.jQuery,
+                                   pollRate: {{spec.poll_rate}}
+                                  })).start();
 </script>
 {% endif %}
