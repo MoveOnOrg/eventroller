@@ -3,6 +3,7 @@ import json
 from django.conf import settings
 from django.contrib.admin.filters import SimpleListFilter
 from django.contrib.contenttypes.models import ContentType
+from django.urls import reverse
 from django.utils.html import format_html, conditional_escape
 
 from event_store.models import Organization, EVENT_REVIEW_CHOICES, EVENT_PREP_CHOICES
@@ -36,6 +37,9 @@ class ReviewerOrganizationFilter(SimpleListFilter):
         val = self.value()
         if val:
             return Organization.objects.filter(id=val).first().slug
+
+    def get_path(self):
+        return reverse('reviewer_base')[:-1] #lop off trailing /
 
     def review_schema_json(self):
         return json.dumps([

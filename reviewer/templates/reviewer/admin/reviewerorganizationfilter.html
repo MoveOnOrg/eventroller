@@ -16,7 +16,8 @@
                                    schema: {{spec.review_schema_json|safe}},
                                    contentType: {{spec.content_type.id}},
                                    jQuery: window.jQuery || django.jQuery,
-                                   pollRate: {{spec.poll_rate}}
+                                   pollRate: {{spec.poll_rate}},
+                                   apiPath: "{{spec.get_path}}"
                                   })).start();
 </script>
 {% endif %}

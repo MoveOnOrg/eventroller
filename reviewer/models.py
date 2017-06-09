@@ -66,25 +66,21 @@ class Review(models.Model):
         if filterargs:
             queryset = queryset.filter(**filterargs)
         query = queryset.order_by('-id')
-        try:
-            distinct = query.distinct('content_type', 'object_id', 'key')
-            if max:
-                distinct = distinct[:max]
-            db_res = list(distinct)
-        except NotImplementedError:
-            # sqlite doesn't support 'DISTINCT ON' so we'll fake it
-            db_res = []
-            if max:
-                query = query[:max*2] # double because could have dupes
-            db_pre = list(query)
-            already = set()
-            for r in db_pre:
-                key = (r.content_type_id, r.object_id, r.key)
-                if key not in already:
-                    db_res.append(r)
-                    already.add(key)
-                    if len(db_res) > max:
-                        break
+        # can't use distinct() because sqlite doesn't support it
+        # and postgres won't do it with an order_by
+        # so we fake it:
+        db_res = []
+        if max:
+            query = query[:max*2] # double because could have dupes
+        db_pre = list(query)
+        already = set()
+        for r in db_pre:
+            key = (r.content_type_id, r.object_id, r.key)
+            if key not in already:
+                db_res.append(r)
+                already.add(key)
+                if len(db_res) > max:
+                    break
         if db_res:
             revs = OrderedDict()
             for rev in db_res:
