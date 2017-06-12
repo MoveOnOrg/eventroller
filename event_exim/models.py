@@ -65,8 +65,9 @@ class EventSource(models.Model):
 
    @cached_property
    def api(self):
-      connector_module = importlib.import_module('event_exim.connectors.%s' % self.crm_type)
-      return connector_module.Connector(self)
+      if self.crm_type:
+         connector_module = importlib.import_module('event_exim.connectors.%s' % self.crm_type)
+         return connector_module.Connector(self)
 
    def update_events(self, update_since=None):
       """

@@ -17,3 +17,5 @@ src
 #.elasticbeanstalk/*
 #!.elasticbeanstalk/*.cfg.yml
 #!.elasticbeanstalk/*.global.yml
+
+zappa_settings.json
