@@ -37,6 +37,9 @@ def event_list_display(obj):
 
 @admin.register(Event)
 class EventAdmin(admin.ModelAdmin):
+    change_list_template = "admin/change_list_filters_top.html"
+    filters_collapsable = True
+    filters_require_submit = True
     disable_list_headers = True
     list_striped = True
     list_display = (event_list_display,)
