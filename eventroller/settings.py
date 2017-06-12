@@ -168,6 +168,8 @@ if os.environ.get('LAMBDA_ZAPPA'):
         #this is for the prefix in deployed state before the / in the path
         FORCE_SCRIPT_NAME = os.environ['FORCE_SCRIPT_NAME']
 
-if not os.environ.get('LAMBDA_ZAPPA') \
-   and os.path.exists(os.path.join(BASE_DIR, 'local_settings.py')):
-    from local_settings import *
+if not os.environ.get('LAMBDA_ZAPPA'):
+   if os.path.exists(os.path.join(BASE_DIR, 'local_settings.py')):
+       from local_settings import *
+elif os.path.exists(os.path.join(BASE_DIR, 'local_settings_zappa.py')):
+       from local_settings_zappa import *

@@ -2,6 +2,7 @@ import datetime
 import json
 import time
 
+from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.http import HttpResponse, HttpResponseForbidden, Http404
 from django.shortcuts import render, get_object_or_404
@@ -26,12 +27,14 @@ from reviewer.models import Review, ReviewLog, ReviewGroup
    and will leverage django-cachalot
 """
 
+REDIS_CACHE_KEY = getattr(settings, 'REVIEWER_CACHE_KEY', 'default')
+
 # should be the upperish size of simultaneous reviewers (per organization)
-FOCUS_MAX = 30
+FOCUS_MAX = getattr(settings, 'REVIEWER_FOCUS_MAX', 30)
 
 # the upperish size of how many review-changes will occur inside the poll rate
 # queue_size should probably be less than focus_max
-QUEUE_SIZE = 12
+QUEUE_SIZE = getattr(settings, 'REVIEWER_QUEUE_SIZE', 12)
 
 def reviewgroup_auth(view_func):
     """
@@ -49,9 +52,13 @@ def reviewgroup_auth(view_func):
     return wrapped
 
 @reviewgroup_auth
+def base(request):
+    return HttpResponse("ok")
+
+@reviewgroup_auth
 def save_review(request, organization, content_type, pk):
     # save a review
-    redis = get_redis_connection("default")
+    redis = get_redis_connection(REDIS_CACHE_KEY)
     itemskey = '{}_items'.format(organization)
     reviewskey = '{}_reviews'.format(organization)
 
@@ -99,7 +106,7 @@ def save_review(request, organization, content_type, pk):
 
 @reviewgroup_auth
 def get_review_history(request, organization):
-    redis = get_redis_connection("default")
+    redis = get_redis_connection(REDIS_CACHE_KEY)
     reviewskey = '{}_reviews'.format(organization)
 
     content_type_id = int(request.GET.get('type'))
@@ -143,7 +150,7 @@ def get_review_history(request, organization):
                 organization_id=org[0].organization_id
             )
             if dbreview:
-                objrev.update(dbreview((content_type_id, pk)))
+                objrev.update(dbreview[(int(content_type_id), int(pk))])
             else:
                 obj = ct.get_object_for_this_type(pk=pk)
                 objrev.update(getattr(obj, 'review_data', lambda: {})())
@@ -163,7 +170,7 @@ def mark_focus(request, organization, content_type, pk):
     # takes the reviewer name from login username
     # saved object: [<type>, <pk>, <name>, <timestamp>]
     # HSET <organization>_focus <name> <object>
-    redis = get_redis_connection("default")
+    redis = get_redis_connection(REDIS_CACHE_KEY)
     rkey = '{}_focus'.format(organization)
     if request.method == "POST":
         name = request.user.get_full_name()
@@ -180,7 +187,7 @@ def mark_focus(request, organization, content_type, pk):
 
 def _clear_old_focus(organization, max=FOCUS_MAX):
     too_old = int(time.time()) - 60*60*2  # 2 hours
-    redis = get_redis_connection("default")
+    redis = get_redis_connection(REDIS_CACHE_KEY)
     rkey = '{}_focus'.format(organization)
     focus = sorted(
         [json.loads(v.decode('utf-8'))
@@ -210,7 +217,7 @@ def current_review_state(request, organization):
       ]
     }
     """
-    redis = get_redis_connection("default")
+    redis = get_redis_connection(REDIS_CACHE_KEY)
     itemskey = '{}_items'.format(organization)
     num_items = int(request.GET.get('num', QUEUE_SIZE / 2))
     items = redis.lrange(itemskey, 0, num_items)
