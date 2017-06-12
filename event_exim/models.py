@@ -147,10 +147,11 @@ class EventDupeGuesses(models.Model):
         unique_together = (('source_event','dupe_event'),)
   
     def source_event_summary(self):
-        source_event = '{}: {}. {}, {}, {}. "{}"'.format(
+        source_event = '{}: {}. {}, {}, {}, {}. "{}"'.format(
             self.source_event.id,
             self.source_event.title,
             self.source_event.venue,
+            self.source_event.address1,
             self.source_event.city,
             self.source_event.state,
             self.source_event.public_description
@@ -159,10 +160,11 @@ class EventDupeGuesses(models.Model):
     source_event_summary.short_description = 'Original Event'
 
     def dupe_event_summary(self):
-        dupe_event = '{}: {}. {}, {}, {}. "{}"'.format(
+        dupe_event = '{}: {}. {}, {}, {}, {}. "{}"'.format(
             self.dupe_event.id,
             self.dupe_event.title,
             self.dupe_event.venue,
+            self.source_event.address1,
             self.dupe_event.city,
             self.dupe_event.state,
             self.dupe_event.public_description
