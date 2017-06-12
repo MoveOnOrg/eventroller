@@ -33,7 +33,6 @@ def event_list_display(obj):
         title=obj.title,
         pk=obj.organization_source_pk,
         venue=obj.venue,
-        private=mark_safe('<div class="alert alert-danger">Private</div>') if obj.is_private else '',
         address='%s %s' % (obj.address1, obj.address2),
         city=obj.city,
         state=obj.state,
