@@ -19,36 +19,8 @@ class Command(BaseCommand):
                 source_event = events[0]
                 for x in range(1, dupe['count'], 1):
                     dupe_event = events[x]
-                    EventDupeGuesses.objects.create_event_dupe(source_event,dupe_event)
-
-    # def add_arguments(self, parser):
-    #     parser.add_argument('--source',
-    #                         help='event source name',
-    #                         type=str)
-    #     parser.add_argument('--update_style',
-    #                         help="\n".join(['which event sources should be updated?',
-    #                                         ' 0=all manual only sources',
-    #                                         ' 3=daily',
-    #                                         ' 4=hourly',
-    #                                     ]),
-    #                         type=int)
-    #     parser.add_argument('--last_update',
-    #                         help=('Use this to override what to consider the last update.'
-    #                               ' Note that this may be a different kind of value per-connector'),
-    #                         type=str)
-
-    # def handle(self, *args, **options):
-    #     sources = []
-    #     source = options.get('source')
-    #     if source:
-    #         sources.append(EventSource.objects.get(name=source))
-    #     else:
-    #         style = options.get('update_style')
-    #         if style:
-    #             sources = EventSource.objects.filter(update_style=style)
-    #     for s in sources:
-    #         kwargs = {}
-    #         if options['last_update'] is not None:
-    #             kwargs['last_update'] = options['last_update']
-    #         print('updating', s, options['last_update'] or '')
-    #         s.update_events(**kwargs)
+                    try:
+                        EventDupeGuesses.objects.create_event_dupe(source_event,dupe_event)
+                        print("Documented duplicate: Events {} and {}".format(source_event.id, dupe_event.id))
+                    except:
+                        print("Duplicate events {} and {} already documented".format(source_event.id, dupe_event.id))

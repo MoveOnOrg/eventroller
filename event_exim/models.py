@@ -142,6 +142,9 @@ class EventDupeGuesses(models.Model):
                                            (1, 'not a duplicate'),
                                            (2, 'yes, duplicates')))
   objects = EventDupeManager()
+  
+  class Meta:
+    unique_together = (('source_event','dupe_event'),)
 
 class Org2OrgShare(models.Model):
   event_source = models.ForeignKey(EventSource, related_name='share_sources')
