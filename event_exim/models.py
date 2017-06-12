@@ -128,6 +128,11 @@ class EventSource(models.Model):
          event.save()
       return changed
 
+class EventDupeManager(models.Manager):
+  def create_event_dupe(self, source_event, dupe_event, decision = 0):
+    event_dupe = self.create(source_event = source_event, dupe_event = dupe_event, decision = 0)
+    event_dupe.save()
+    return event_dupe.id
 
 class EventDupeGuesses(models.Model):
   source_event = models.ForeignKey(Event, related_name='dupe_guesses')
@@ -136,7 +141,7 @@ class EventDupeGuesses(models.Model):
   decision = models.IntegerField(choices=( (0, 'undecided'),
                                            (1, 'not a duplicate'),
                                            (2, 'yes, duplicates')))
-
+  objects = EventDupeManager()
 
 class Org2OrgShare(models.Model):
   event_source = models.ForeignKey(EventSource, related_name='share_sources')
