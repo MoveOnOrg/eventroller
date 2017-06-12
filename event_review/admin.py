@@ -9,13 +9,21 @@ def event_list_display(obj):
     return format_html("""
         <div class="row">
             <div class="col-md-6">
-                <h5>{title}</h5>
+                <h5>{title} ({pk})</h5>
                 {private}
-                <div><b>Host:</b> {host}</div>
-                <div><b>Venue:</b> {venue}</div>
+                <div><b>Host:</b> {host} ({host_is_confirmed})</div>
+                <div><b>Where:</b>
+                    <div>{venue}</div>
+                    <div>{address}</div>
+                    <div>{city}, {state}</div>
+                </div>
+                <div><b>When:</b> {when}</div>
+                <div><b>Attendees:</b> {attendee_count}{max_attendees}</div>
+                <div><b>Political Scope:</b> {political_scope}</div>
                 <div><b>Description</b> {description}</div>
             </div>
             <div class="col-md-6">
+                <div><b>Private Phone:</b> {private_phone}</div>
                 <div><b>Review Status:</b> {review_status}</div>
                 <div><b>Prep Status:</b> {prep_status}</div>
                 <div><b>Active Status:</b> {active_status}</div>
@@ -24,16 +32,31 @@ def event_list_display(obj):
         </div>
         """,
         title=obj.title,
+        pk=obj.organization_source_pk,
         venue=obj.venue,
-        private=mark_safe('<div class="alert alert-danger">Private</div>') if obj.is_private else '',
+        address='%s %s' % (obj.address1, obj.address2),
+        city=obj.city,
+        state=obj.state,
+        political_scope=obj.political_scope,
+        private_phone=obj.private_phone,
+        when=obj.starts_at_utc,
+        attendee_count=obj.attendee_count,
+        max_attendees='/%s' % obj.max_attendees
+                      if obj.max_attendees else '',
+        host_is_confirmed='confirmed'
+                          if obj.host_is_confirmed else 'unconfirmed',
+        private=mark_safe('<div class="alert alert-danger">Private</div>')
+                if obj.is_private else '',
         host=obj.organization_host,
         review_status=obj.organization_status_review,
         prep_status=obj.organization_status_prep,
         active_status=obj.status,
         notes=mark_safe('<textarea rows="5" class="form-control" readonly>%s</textarea>' % obj.notes)
-            if obj.notes else None,
-        description = mark_safe('<textarea rows="5" class="form-control" readonly>%s</textarea>' % obj.public_description)
-            if obj.public_description else None)
+              if obj.notes else None,
+        description=mark_safe('<textarea rows="5" class="form-control" readonly>%s</textarea>' % obj.public_description)
+                    if obj.public_description else None)
+
+# attendee count, max attendees
 
 @admin.register(Event)
 class EventAdmin(admin.ModelAdmin):
