@@ -249,7 +249,7 @@ Reviewer.prototype = {
                       return self.renderDecisions(schema, reviewSubject)
                    }).join('')
             + '    <div class="form-inline form-group">'
-            + '      <label>Log</label><input class="log form-control" type="text" />'
+            + '      <label>Note </label> <input class="log form-control" type="text" />'
             + '    </div>'
             + '  </div>'
             + '  <div class="review-header" style="padding-left:15px;">'
@@ -259,8 +259,8 @@ Reviewer.prototype = {
             + '  </div>'
             + ' </div>'
             + ' <div class="panel panel-default">'
-            + '  <div class="panel-heading">Logs</div>'
-            + '  <div class="logs panel-body" aria-labelledby="Logs" style="max-height:4em;overflow-y:scroll">'
+            + '  <div class="panel-heading">Notes</div>'
+            + '  <div class="logs panel-body" aria-labelledby="Notes" style="max-height:4em;overflow-y:scroll">'
             +      this.renderLog(reviewSubject)
             + '  </div>'
             + ' </div>'

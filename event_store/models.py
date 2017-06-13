@@ -1,5 +1,6 @@
 from __future__ import unicode_literals
 import hashlib
+import re
 
 from django.db import models
 from django.contrib.auth.models import User, Group
@@ -209,6 +210,17 @@ class Event(models.Model):
             'review_status': self.organization_status_review,
             'prep_status': self.organization_status_prep,
         }
+
+    def political_scope_display(self):
+        if self.political_scope:
+            m = re.match(
+                r'ocd-division/country:(?P<country>\w+)/\w+:(?P<region>\w+)/(?P<district_type>\w+):(?P<district>\w+)',
+                self.political_scope)
+            if m:
+                return '{}_{}'.format(m.group('region').upper(), m.group('district').upper())
+            else:
+                return self.political_scope
+        return ''
 
     def on_save_review(self, reviews, log_message=None):
         """
