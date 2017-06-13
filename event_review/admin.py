@@ -36,7 +36,7 @@ def event_list_display(obj):
         address='%s %s' % (obj.address1, obj.address2),
         city=obj.city,
         state=obj.state,
-        political_scope=obj.political_scope,
+        political_scope=obj.political_scope_display(),
         private_phone=obj.private_phone,
         when=obj.starts_at_utc,
         attendee_count=obj.attendee_count,
