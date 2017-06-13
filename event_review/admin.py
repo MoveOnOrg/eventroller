@@ -89,7 +89,7 @@ class EventAdmin(admin.ModelAdmin):
 
     def get_actions(self, request):
         actions = super(EventAdmin, self).get_actions(request)
-        if 'deleted_selected' in actions:
+        if 'delete_selected' in actions:
             del actions['delete_selected']
         return actions
 
