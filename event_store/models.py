@@ -179,7 +179,7 @@ class Event(models.Model):
     # See https://opencivicdata.readthedocs.io/en/latest/proposals/0002.html
     political_scope = models.CharField(max_length=765, null=True, blank=True) #ocdep, districts, etc maybe
 
-    dupe_id = models.ForeignKey('self', null=True, blank=True, on_delete=models.SET_NULL)
+    dupe = models.ForeignKey('self', null=True, blank=True, on_delete=models.SET_NULL)
     venue_category = models.IntegerField(choices=((0, 'unknown'),
                                                   (1, 'private home'),
                                                   (2, 'public space'),

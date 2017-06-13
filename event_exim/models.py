@@ -7,6 +7,8 @@ from django.contrib.auth.models import User, Group
 from django.contrib.postgres.fields import JSONField
 from django.db import models
 from django.utils.functional import cached_property
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 
 from event_store.models import Activist, Event, Organization
 from event_exim import connectors
@@ -171,6 +173,13 @@ class EventDupeGuesses(models.Model):
         )
         return dupe_event
     dupe_event_summary.short_description = 'Duplicate Event'
+
+@receiver(post_save, sender = EventDupeGuesses, dispatch_uid = 'update_event_dupe')
+def update_event_dupe_id(sender, instance, **kwargs):
+    if instance.decision == 2:
+      instance.dupe_event.dupe_id = instance.source_event.id
+    elif instance.decision == 1:
+      instance.dupe_event.dupe_id = None
 
 class Org2OrgShare(models.Model):
     event_source = models.ForeignKey(EventSource, related_name='share_sources')
