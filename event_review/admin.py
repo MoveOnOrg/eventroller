@@ -13,6 +13,27 @@ def phone_format(phone):
                        re.sub(r'^(\d{3})(\d{3})(\d{4})', '(\\1) \\2-\\3',
                               phone))
 
+def host_format(event):
+    host_items = []
+    host = event.organization_host
+    if not host.email:
+        host_items.append(str(host))
+    else:
+        host_items.append(format_html('<a data-system-pk="{}" href="mailto:{}">{}</a>',
+                                      host.member_system_pk or '',
+                                      host.email,
+                                      host))
+
+    if event.host_is_confirmed:
+        host_items.append(mark_safe(' (<span style="color:green">confirmed</span>) '))
+    else:
+        host_items.append(mark_safe(' (<span style="color:red">unconfirmed</span>) '))
+
+    host_link = event.host_edit_url(edit_access=True)
+    if host_link:
+        host_items.append(format_html('<a href="{}">Act as host</a>', host_link))
+    return mark_safe(''.join(host_items))
+
 def event_list_display(obj):
     scope = obj.political_scope_display()
     if scope:
@@ -22,7 +43,7 @@ def event_list_display(obj):
             <div class="col-md-6">
                 <h5>{title} ({pk})</h5>
                 {private}
-                <div><b>Host:</b> {host} ({host_is_confirmed})</div>
+                <div><b>Host:</b> {host}</div>
                 <div><b>Where:</b>{political_scope}
                     <div>{venue}</div>
                     <div>{address}</div>
@@ -51,12 +72,9 @@ def event_list_display(obj):
         attendee_count=obj.attendee_count,
         max_attendees='/%s' % obj.max_attendees
                       if obj.max_attendees else '',
-        host_is_confirmed=mark_safe('<span style="color:green">confirmed</span>'
-                                    if obj.host_is_confirmed
-                                    else '<span style="color:red">unconfirmed</span>'),
         private=mark_safe('<div class="label label-danger">Private</div>')
                 if obj.is_private else '',
-        host=obj.organization_host,
+        host=host_format(obj),
         #review_status=obj.organization_status_review,
         #prep_status=obj.organization_status_prep,
         active_status=obj.status,
@@ -98,3 +116,8 @@ class EventAdmin(admin.ModelAdmin):
 
     def has_add_permission(self, request, obj=None):
         return False
+
+    def get_queryset(self, *args, **kw):
+        qs = super(EventAdmin, self).get_queryset(*args, **kw)
+        qs = qs.select_related('organization_host')
+        return qs

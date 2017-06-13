@@ -117,7 +117,12 @@ class Connector:
                 'ignore_host_ids': {'help_text': ('if you want to ignore certain hosts'
                                                   ' (due to automation/admin status) add'
                                                   ' them as a json list of integers'),
-                                    'required': False}
+                                    'required': False},
+                'cohost_id': {'help_text': ('for easy Act-as-host links, if all events'
+                                            ' have a cohost, then this will create'
+                                            ' links that do not need ActionKit staff access'),
+                              'required': False}
+
         }
 
     def __init__(self, event_source):
@@ -132,6 +137,8 @@ class Connector:
             AK_SECRET = data.get('ak_secret')
         self.akapi = AKAPI(aksettings)
         self.ignore_hosts = data['ignore_host_ids'] if 'ignore_host_ids' in data else []
+        self.cohost_id = data.get('cohost_id')
+        self._login_tokens = {}
 
     def _load_events_from_sql(self, ordering='ee.updated_at', max_results=10000, offset=0,
                     excludes=[], additional_where=[], additional_params={}):
@@ -215,6 +222,10 @@ class Connector:
                              'event_facebook_url': None,
                              'organization_status_review': event_row[fi['review_status']],
                              'organization_status_prep': event_row[fi['prep_status']],
+                             'source_json_data': {
+                                 # other random data to keep around
+                                 'campaign_id': event_row[fi['ee.campaign_id']],
+                             },
                          })
         for df in self.date_fields:
             if event_fields[df]:
@@ -271,6 +282,16 @@ class Connector:
                                                r.key, r.decision,
                                                eventfield_id=eventfields.get(r.key))
 
-    def get_host_event_link(self, event):
-        #might include a temporary token
-        pass
+    def get_host_event_link(self, event, edit_access=False):
+        host_link = '{}host/'.format(event.rsvp_url)
+        if edit_access and self.cohost_id and self.akapi.secret:
+            #easy memoization for a single user
+            token = self._login_tokens.get(self.cohost_id, False)
+            if token is False:
+                token = self.akapi.login_token(self.cohost_id)
+                self._login_tokens[self.cohost_id] = token
+            if token:
+                path = host_link.split(self.base_url)[1]
+                host_link = '{}/login/?i={}&l=1&next={}'.format(self.base_url, token, path)
+        return host_link
+
