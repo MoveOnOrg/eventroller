@@ -69,14 +69,14 @@ class EventSource(models.Model):
          connector_module = importlib.import_module('event_exim.connectors.%s' % self.crm_type)
          return connector_module.Connector(self)
 
-   def update_events(self, update_since=None):
+   def update_events(self, last_update=None):
       """
       Sync events from source to local database
       """
       # 1. load events from our connector
-      if update_since is None:
-         update_since = self.last_update
-      event_data = self.api.load_events(last_updated=update_since)
+      if last_update is None:
+         last_update = self.last_update
+      event_data = self.api.load_events(last_updated=last_update)
 
       all_events = {str(e['organization_source_pk']):e for e in event_data['events']}
       new_host_ids = set([e['organization_host'].member_system_pk for e in all_events.values()])
