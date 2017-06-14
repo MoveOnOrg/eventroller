@@ -4,7 +4,6 @@ import time
 
 from django.conf import settings
 from django.contrib.auth.models import User, Group
-from django.contrib.postgres.fields import JSONField
 from django.db import models
 from django.utils.functional import cached_property
 
@@ -31,12 +30,12 @@ class EventSource(models.Model):
    
    """
    name = models.CharField(max_length=128, help_text="e.g. campaign or just describe the system")
-   origin_organization = models.ForeignKey(Organization)
+   origin_organization = models.ForeignKey(Organization, related_name='source')
    osdi_name = models.CharField(max_length=765)
 
    crm_type = models.CharField(max_length=16, choices=[(k,k) for k in CRM_TYPES])
 
-   crm_data = JSONField(null=True, blank=True)
+   crm_data = models.TextField(null=True, blank=True)
 
    #(provided: ping url for update (put this on your thanks page for event creation)
    update_style = models.IntegerField(choices=(
@@ -96,9 +95,11 @@ class EventSource(models.Model):
                for hf in host_update_fields:
                   if getattr(host_by_pk, hf) != getattr(ehost, hf):
                      ehost.save()
+                     existing_hosts[ehost.member_system_pk] = ehost
                      break #inner loop
             else:
                ehost.save()
+               existing_hosts[ehost.member_system_pk] = ehost
 
       # 3. bulk-create all new events not in the system yet
       existing_ids = set([e.organization_source_pk for e in existing])
@@ -146,7 +147,7 @@ class Org2OrgShare(models.Model):
                                          (0, 'offered'),
                                          (1, 'enabled')))
 
-  filters = JSONField(null=True, blank=True)
+  filters = models.TextField(null=True, blank=True)
 
   created_at = models.DateTimeField(auto_now_add=True)
   modified_at = models.DateTimeField(auto_now=True)

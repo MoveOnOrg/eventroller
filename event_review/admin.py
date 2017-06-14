@@ -78,7 +78,7 @@ def event_list_display(obj):
         #review_status=obj.organization_status_review,
         #prep_status=obj.organization_status_prep,
         active_status=obj.status,
-        review_widget=review_widget(obj),
+        review_widget=review_widget(obj, obj.organization_host_id),
         #notes=mark_safe('<textarea rows="5" class="form-control" readonly>%s</textarea>' % obj.notes)
         #    if obj.notes else None,
         description = mark_safe('<textarea rows="5" class="form-control" readonly>%s</textarea>' % obj.public_description)
@@ -119,5 +119,5 @@ class EventAdmin(admin.ModelAdmin):
 
     def get_queryset(self, *args, **kw):
         qs = super(EventAdmin, self).get_queryset(*args, **kw)
-        qs = qs.select_related('organization_host')
+        qs = qs.select_related('organization_host', 'organization_source')
         return qs
