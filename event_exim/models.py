@@ -6,6 +6,8 @@ from django.conf import settings
 from django.contrib.auth.models import User, Group
 from django.db import models
 from django.utils.functional import cached_property
+# from django.db.models.signals import post_save
+# from django.dispatch import receiver
 
 from event_store.models import Activist, Event, Organization
 from event_exim import connectors
@@ -129,6 +131,11 @@ class EventSource(models.Model):
          event.save()
       return changed
 
+class EventDupeManager(models.Manager):
+    def create_event_dupe(self, source_event, dupe_event):
+        event_dupe = self.create(source_event = source_event, dupe_event = dupe_event, decision = 0)
+        event_dupe.save()
+        return event_dupe.id
 
 class EventDupeGuesses(models.Model):
   source_event = models.ForeignKey(Event, related_name='dupe_guesses')
@@ -136,7 +143,61 @@ class EventDupeGuesses(models.Model):
 
   decision = models.IntegerField(choices=( (0, 'undecided'),
                                            (1, 'not a duplicate'),
-                                           (2, 'yes, duplicates')))
+                                             (2, 'yes, duplicates')), 
+                                             verbose_name = 'Status',
+                                             null = True,
+                                             blank = True
+                                            )
+
+    objects = EventDupeManager()
+    class Meta:
+        unique_together = (('source_event','dupe_event'),)
+  
+    def source_event_summary(self):
+        source_event = '{} (source ID: {}): {}. {}, {}, {}, {}. "{}". RSVP: {}'.format(
+            self.source_event.id,
+            self.source_event.organization_source_pk,
+            self.source_event.title,
+            self.source_event.venue,
+            self.source_event.address1,
+            self.source_event.city,
+            self.source_event.state,
+            self.source_event.public_description,
+            str(self.source_event.rsvp_url)
+        )
+        return source_event
+    source_event_summary.short_description = 'Original Event'
+
+    def dupe_event_summary(self):
+        dupe_event = '{} (source ID: {}): {}. {}, {}, {}, {}. "{}". RSVP at {}'.format(
+            self.dupe_event.id,
+            self.dupe_event.organization_source_pk,
+            self.dupe_event.title,
+            self.dupe_event.venue,
+            self.dupe_event.address1,
+            self.dupe_event.city,
+            self.dupe_event.state,
+            self.dupe_event.public_description,
+            str(self.dupe_event.rsvp_url)
+        )
+        return dupe_event
+    dupe_event_summary.short_description = 'Duplicate Event'
+
+# Currently doesn't handle the case where an event has more than one duplicate. 
+# Implementing this should wait until we have a clear use case for dupe_id on events
+# @receiver(post_save, sender = EventDupeGuesses, dispatch_uid = 'update_event_dupe')
+# def update_event_dupe_id(sender, instance, **kwargs):
+#     print("now in post save!")
+#     # yes, a duplicate
+#     if instance.decision == 2:
+#         instance.dupe_event.dupe_id = instance.source_event_id
+#         instance.dupe_event.save()
+#         print("recording dupe id %s on event %s" %(instance.source_event_id, instance.dupe_event.id))
+#     # undecided or not a duplicate
+#     elif instance.decision == 1 or instance.decision == 0 or instance.decision == None:
+#         instance.dupe_event.dupe_id = None
+#         instance.dupe_event.save()
+#         print("event %s dupe_id set to None" % instance.dupe_event.id)
 
 
 class Org2OrgShare(models.Model):
