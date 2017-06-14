@@ -44,7 +44,11 @@ class Command(BaseCommand):
                         try:
                             (
                                 EventDupeGuesses.objects
-                                .create_event_dupe(source_event, dupe_event)
+                                .create(
+                                    source_event = source_event, 
+                                    dupe_event = dupe_event, 
+                                    decision = 0
+                                )
                             )
                             print (
                                 "Documented duplicate guess: Events {} and {}"

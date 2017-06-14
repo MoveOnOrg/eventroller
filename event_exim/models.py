@@ -130,12 +130,6 @@ class EventSource(models.Model):
             event.save()
         return changed
 
-class EventDupeManager(models.Manager):
-    def create_event_dupe(self, source_event, dupe_event):
-        event_dupe = self.create(source_event = source_event, dupe_event = dupe_event, decision = 0)
-        event_dupe.save()
-        return event_dupe.id
-
 class EventDupeGuesses(models.Model):
     source_event = models.ForeignKey(Event, related_name='dupe_guesses')
     dupe_event = models.ForeignKey(Event, related_name='dupe_guess_sources')
@@ -148,7 +142,6 @@ class EventDupeGuesses(models.Model):
                                              blank = True
                                             )
 
-    objects = EventDupeManager()
     class Meta:
         unique_together = (('source_event','dupe_event'),)
   
