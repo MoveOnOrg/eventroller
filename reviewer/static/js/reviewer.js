@@ -78,7 +78,7 @@ Reviewer.prototype = {
     var $ = this.opt.jQuery;
     var pk = $(widget).attr('data-pk');
     if (!(this.state[pk])) {
-      this.state[pk] = {'pk': pk, 'o': widget, 'data': null};
+      this.state[pk] = {'pk': pk, 'o': widget, 'data': null, 'focus': []};
     }
   },
   updateMissingData: function(callback) {
@@ -180,7 +180,12 @@ Reviewer.prototype = {
           var f = data.focus[i];
           // We don't test lastUpdate for focus because we cleared focus from before
           if (opt.contentType == f[0] && f[1] in self.state) {
-            newFocus[f[1]] = f[2];
+            if (f[1] in newFocus) {
+              newFocus[f[1]].push(f[2]);
+              newFocus[f[1]].sort(); //make sure the order is consistent
+            } else {
+              newFocus[f[1]] = [ f[2] ];
+            }
           }
         }
         // 2. update focus dom
@@ -190,7 +195,8 @@ Reviewer.prototype = {
           // not just update new focii, but clear old
           for (var pk in self.state) {
             if (pk in newFocus) {
-              if (newFocus[pk] != self.state[pk].focus) {
+              //dumbest, but easiest way to compare lists
+              if (newFocus[pk].toString() != self.state[pk].focus.toString()) {
                 self.state[pk].focus = newFocus[pk];
                 self.renderFocusUpdate(self.state[pk]);
               }
@@ -254,7 +260,7 @@ Reviewer.prototype = {
             + '  </div>'
             + '  <div class="review-header" style="padding-left:15px;">'
             + '      <button class="btn btn-default btn-primary save">Save</button>'
-            + '      <span class="focus label label-info">' + this.renderFocus(reviewSubject) + '</span>'
+            + '      <span class="focus">' + this.renderFocus(reviewSubject) + '</span>'
             + '      <span class="saved label label-success"></span>' // save status
             + '  </div>'
             + ' </div>'
@@ -311,7 +317,12 @@ Reviewer.prototype = {
     });
   },
   renderFocus: function(reviewSubject) {
-    return (reviewSubject.focus || '');
+    if (!reviewSubject.focus || !reviewSubject.focus.length) {
+      return '';
+    }
+    return reviewSubject.focus.map(function(reviewer) {
+      return '<span class="label label-info">'+reviewer+'</span>'
+    }).join('');
   },
   renderFocusUpdate: function(reviewSubject) {
     this.$('.focus', reviewSubject.o).html(this.renderFocus(reviewSubject));

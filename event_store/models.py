@@ -198,9 +198,11 @@ class Event(models.Model):
     organization_status_prep = models.CharField(max_length=32, blank=True, null=True, db_index=True,
                                                 choices=EVENT_PREP_CHOICES)
 
-    #later
-    def host_edit_url(self):
-        pass #organization can implement
+
+    def host_edit_url(self, edit_access=False):
+        src = self.organization_source
+        if src and hasattr(src.api, 'get_host_event_link'):
+            return src.api.get_host_event_link(self, edit_access=edit_access)
 
     def handle_rsvp(self):
         return None #organization can implement
