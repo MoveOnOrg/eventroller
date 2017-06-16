@@ -4,6 +4,7 @@ import time
 
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
+from django.db.models import Q
 from django.http import HttpResponse, HttpResponseForbidden, Http404
 from django.shortcuts import render, get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
@@ -66,6 +67,7 @@ def save_review(request, organization, content_type, pk):
         content_type = request.POST.get('content_type')
         decisions_str = request.POST.get('decisions', '')
         log_message = request.POST.get('log')
+        subject = request.POST.get('subject')
         if content_type and pk and len(decisions_str) >= 3\
            and ':' in decisions_str:
             org = ReviewGroup.org_groups(organization)
@@ -83,6 +85,7 @@ def save_review(request, organization, content_type, pk):
             if log_message:
                 ReviewLog.objects.create(content_type=ct,
                                          object_id=obj.id,
+                                         subject=int(subject) if subject else None,
                                          organization_id=org[0].organization_id,
                                          reviewer=request.user,
                                          message=log_message)
@@ -106,6 +109,13 @@ def save_review(request, organization, content_type, pk):
 
 @reviewgroup_auth
 def get_review_history(request, organization):
+    """
+    GET parameters:
+    @type: content_type_id (it should be a number) corresponding to Django contenttype
+    @pks: comma separated list of ids for type
+    @subjects: optional parameter that will expand review logs to include subjects
+               must be indexed by same pk order
+    """
     redis = get_redis_connection(REDIS_CACHE_KEY)
     reviewskey = '{}_reviews'.format(organization)
 
@@ -119,20 +129,31 @@ def get_review_history(request, organization):
         cached_reviews = redis.hmget(reviewskey, *pk_keys)
     logs = []
     if getlogs:
+        subjects = {}
+        for i,s in enumerate(request.GET.get('subjects','').split(',')):
+            if s:
+                subjects[pks[i]] = s
         for pk in pks:
             if not pk:
                 continue
+            subject = subjects.get(pk)
+            filters = Q(content_type_id=content_type_id,
+                        object_id=int(pk))
+            if subject:
+                filters = filters | Q(content_type_id=content_type_id,
+                                      subject=int(subject))
             review_logs = ReviewLog.objects.filter(
-                             organization__slug=organization,
-                             content_type_id=content_type_id,
-                             object_id=int(pk)
-                         ).order_by('-id').values('reviewer__first_name',
-                                                  'reviewer__last_name',
-                                                  'message',
-                                                  'created_at')
+                organization__slug=organization).filter(
+                    filters).order_by('-id').values('reviewer__first_name',
+                                                    'reviewer__last_name',
+                                                    'message',
+                                                    'created_at',
+                                                    'object_id',
+                                                )
             logs.append({"pk": pk, 'type': content_type_id,
                          "m": [{
                              'r': '{} {}'.format(r['reviewer__first_name'],r['reviewer__last_name'][:1]),
+                             'pk': r['object_id'], #for subject search broadening
                              'm': r['message'],
                              'ts': int(time.mktime(r['created_at'].timetuple()))
                          } for r in review_logs]})

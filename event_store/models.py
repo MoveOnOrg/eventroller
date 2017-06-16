@@ -4,7 +4,6 @@ import re
 
 from django.db import models
 from django.contrib.auth.models import User, Group
-from django.contrib.postgres.fields import JSONField
 
 class Organization(models.Model):
     title = models.CharField(max_length=765)
@@ -140,16 +139,18 @@ class Event(models.Model):
     #eventIdObfuscated: {type: GraphQLString},
     organization_official_event = models.NullBooleanField(null=True)
     event_type = models.CharField(max_length=765, null=True, blank=True)
-    organization_host = models.ForeignKey('Activist', blank=True, null=True)
+    organization_host = models.ForeignKey('Activist', blank=True, null=True, on_delete=models.SET_NULL)
     organization = models.ForeignKey('Organization', blank=True, null=True, db_index=True)
-    organization_source = models.ForeignKey('event_exim.EventSource', blank=True, null=True, db_index=True)
+    organization_source = models.ForeignKey('event_exim.EventSource', blank=True, null=True,
+                                            on_delete=models.SET_NULL,
+                                            db_index=True)
     organization_campaign = models.CharField(max_length=765, db_index=True)
     organization_source_pk = models.CharField(max_length=765, blank=True, null=True, db_index=True)
 
     #this can be any other data the event source wants/needs to store
     # in this field to resolve additional information.  It can be the original data,
     # but could also be more extended info like social sharing data
-    source_json_data = JSONField(null=True, blank=True)
+    source_json_data = models.TextField(null=True, blank=True)
 
     #hostId: {type: GraphQLString}, = add primary_host
     #localTimezone: {type: GraphQLString}, #not there, but starts_at + starts_at_utc sorta does that
