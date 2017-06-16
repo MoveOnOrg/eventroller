@@ -288,7 +288,16 @@ class Connector:
                                                r.key, r.decision,
                                                eventfield_id=eventfields.get(r.key))
 
+    def get_admin_event_link(self, event):
+        if event.source_json_data:
+            cid = json.loads(event.source_json_data).get('campaign_id')
+            if cid:
+                return '{}/admin/events/event/?campaign={cid}&event_id={eid}'.format(
+                    self.base_url, cid=cid, eid=event.organization_source_pk)
+
     def get_host_event_link(self, event, edit_access=False):
+        if event.status != 'active':
+            return None
         jsondata = event.source_json_data
         create_page = None
         if jsondata:
