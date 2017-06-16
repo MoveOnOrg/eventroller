@@ -5,7 +5,7 @@ from django import forms
 from django.utils.html import format_html, mark_safe
 
 from event_store.models import Event
-from reviewer.filters import ReviewerOrganizationFilter, review_widget
+from reviewer.filters import ReviewerOrganizationFilter, review_widget, EventMinDateFilter
 from huerta.filters import CollapsedListFilter
 
 def phone_format(phone):
@@ -98,7 +98,7 @@ class EventAdmin(admin.ModelAdmin):
                    ('organization_status_prep', CollapsedListFilter),
                    ('state', CollapsedListFilter),
                    ('is_private', CollapsedListFilter),
-                   ('starts_at', CollapsedListFilter),
+                   EventMinDateFilter,
                    ('ends_at', CollapsedListFilter),
                    ('attendee_count', CollapsedListFilter),
                    ('status', CollapsedListFilter),
