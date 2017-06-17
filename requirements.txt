@@ -11,6 +11,7 @@ psycopg2==2.7.1
 
 requests[security]==2.11.1
 six==1.10.0
+drf-hal-json==0.9.1
 
 fakeredis
 django-redis~=4.4
