@@ -81,6 +81,8 @@ TEMPLATES = [
 WSGI_APPLICATION = 'eventroller.wsgi.application'
 
 REST_FRAMEWORK = {
+    'DEFAULT_PAGINATION_CLASS': 'osdi.pagination.OsdiPagination',
+    'PAGE_SIZE': 5, # something low, so it's explicit, when bigger
     'DEFAULT_RENDERER_CLASSES': (
         'rest_framework.renderers.JSONRenderer',
         'rest_framework.renderers.BrowsableAPIRenderer',
