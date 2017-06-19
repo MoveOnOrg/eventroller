@@ -100,7 +100,6 @@ Reviewer.prototype = {
   loadReviewData: function(pks, callback, subjects) {
     var self = this;
     var useSubjects = (subjects || []).filter(function(x){return x}).length;
-    console.log(useSubjects, subjects);
     this.$.getJSON(this.opt.apiPath + '/history/' + this.opt.organization
                    + '/?logs=1&type=' + this.opt.contentType
                    + '&pks=' + pks.join(',')

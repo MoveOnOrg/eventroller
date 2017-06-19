@@ -5,8 +5,8 @@ from django import forms
 from django.utils.html import format_html, mark_safe
 
 from event_store.models import Event
-from reviewer.filters import ReviewerOrganizationFilter, review_widget, EventMinDateFilter
-from huerta.filters import CollapsedListFilter
+from reviewer.filters import ReviewerOrganizationFilter, review_widget
+from event_review.filters import CollapsedListFilter, ReviewFilter
 
 def phone_format(phone):
     return format_html('<span style="white-space: nowrap">{}</span>',
@@ -16,7 +16,7 @@ def phone_format(phone):
 def host_format(event):
     host_items = []
     host = event.organization_host
-    if not host.email:
+    if not getattr(host, 'email', None):
         host_items.append(str(host))
     else:
         host_items.append(format_html('<a data-system-pk="{}" href="mailto:{}">{}</a>',
@@ -34,10 +34,23 @@ def host_format(event):
         host_items.append(format_html('<a href="{}">Act as host</a>', host_link))
     return mark_safe(''.join(host_items))
 
-def event_list_display(obj):
+def event_list_display(obj, onecol=False):
     scope = obj.political_scope_display()
     if scope:
         scope = ' ({})'.format(scope)
+    second_col = ''
+    if not onecol:
+        second_col = format_html("""
+          <div class="col-md-6">
+            <div><b>Private Phone:</b> {private_phone}</div>
+            <div><b>Event Status:</b> {active_status}</div>
+            {review_widget}
+          </div>
+        """,
+        private_phone=phone_format(obj.private_phone),
+        active_status=obj.status,
+        review_widget=review_widget(obj, obj.organization_host_id)
+        )
     return format_html("""
         <div class="row">
             <div class="col-md-6">
@@ -53,11 +66,7 @@ def event_list_display(obj):
                 <div><b>Attendees:</b> {attendee_count}{max_attendees}</div>
                 <div><b>Description</b> {description}</div>
             </div>
-            <div class="col-md-6">
-                <div><b>Private Phone:</b> {private_phone}</div>
-                <div><b>Event Status:</b> {active_status}</div>
-                {review_widget}
-            </div>
+            {second_col}
         </div>
         """,
         title=obj.title,
@@ -67,7 +76,6 @@ def event_list_display(obj):
         city=obj.city,
         state=obj.state,
         political_scope=scope,
-        private_phone=phone_format(obj.private_phone),
         when=obj.starts_at.strftime('%c'),
         attendee_count=obj.attendee_count,
         max_attendees='/%s' % obj.max_attendees
@@ -75,10 +83,9 @@ def event_list_display(obj):
         private=mark_safe('<div class="label label-danger">Private</div>')
                 if obj.is_private else '',
         host=host_format(obj),
+        second_col=second_col,
         #review_status=obj.organization_status_review,
         #prep_status=obj.organization_status_prep,
-        active_status=obj.status,
-        review_widget=review_widget(obj, obj.organization_host_id),
         #notes=mark_safe('<textarea rows="5" class="form-control" readonly>%s</textarea>' % obj.notes)
         #    if obj.notes else None,
         description = mark_safe('<textarea rows="5" class="form-control" readonly>%s</textarea>' % obj.public_description)
@@ -86,7 +93,7 @@ def event_list_display(obj):
 
 @admin.register(Event)
 class EventAdmin(admin.ModelAdmin):
-    change_list_template = "admin/change_list_filters_top.html"
+    change_list_template = "admin/change_list_filters_top.html" #part of huerta
     filters_collapsable = True
     filters_require_submit = True
     disable_list_headers = True
@@ -94,7 +101,7 @@ class EventAdmin(admin.ModelAdmin):
     list_display = (event_list_display,)
     list_filter = (ReviewerOrganizationFilter,
                    ('organization_campaign', CollapsedListFilter),
-                   ('organization_status_review', CollapsedListFilter),
+                   ('organization_status_review', ReviewFilter),
                    ('organization_status_prep', CollapsedListFilter),
                    ('state', CollapsedListFilter),
                    ('is_private', CollapsedListFilter),

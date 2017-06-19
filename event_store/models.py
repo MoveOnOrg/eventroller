@@ -66,7 +66,7 @@ class Activist(models.Model):
         return False
 
 
-EVENT_REVIEW_CHOICES = (('', 'New'),
+EVENT_REVIEW_CHOICES = ((None, 'New'),
                         ('reviewed', 'Reviewed'),
                         ('vetted', 'Vetted'),
                         ('questionable', 'Questionable'),
@@ -133,7 +133,7 @@ class Event(models.Model):
     public_description = models.TextField(blank=True)
     directions = models.TextField(blank=True)
     note_to_attendees = models.TextField(blank=True)
-    notes = models.TextField(blank=True)
+    internal_notes = models.TextField(blank=True)
 
     #from ground-control
     #eventIdObfuscated: {type: GraphQLString},
