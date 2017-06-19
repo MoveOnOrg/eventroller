@@ -16,7 +16,7 @@ def phone_format(phone):
 def host_format(event):
     host_items = []
     host = event.organization_host
-    if not host.email:
+    if not getattr(host, 'email', None):
         host_items.append(str(host))
     else:
         host_items.append(format_html('<a data-system-pk="{}" href="mailto:{}">{}</a>',
