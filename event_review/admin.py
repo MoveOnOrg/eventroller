@@ -6,7 +6,11 @@ from django.utils.html import format_html, mark_safe
 
 from event_store.models import Event
 from reviewer.filters import ReviewerOrganizationFilter, review_widget
-from event_review.filters import CollapsedListFilter, ReviewFilter
+from event_review.filters import (CollapsedListFilter,
+                                  EventAttendeeMaxFilter,
+                                  EventAttendeeCountFilter,
+                                  EventFullness,
+                                  ReviewFilter)
 
 def phone_format(phone):
     return format_html('<span style="white-space: nowrap">{}</span>',
@@ -107,9 +111,11 @@ class EventAdmin(admin.ModelAdmin):
                    ('is_private', CollapsedListFilter),
                    ('starts_at', CollapsedListFilter),
                    ('ends_at', CollapsedListFilter),
-                   ('attendee_count', CollapsedListFilter),
                    ('status', CollapsedListFilter),
-                   ('host_is_confirmed', CollapsedListFilter))
+                   ('host_is_confirmed', CollapsedListFilter),
+                   EventAttendeeMaxFilter,
+                   EventAttendeeCountFilter,
+                   EventFullness)
     list_display_links = None
 
     def get_actions(self, request):
