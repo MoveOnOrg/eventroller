@@ -1,5 +1,4 @@
 import json
-import datetime
 
 from django.conf import settings
 from django.contrib.admin.filters import SimpleListFilter
@@ -67,24 +66,4 @@ class ReviewerOrganizationFilter(SimpleListFilter):
         if org:
             filterargs = {self.fieldname: org}
             return queryset.filter(**filterargs)
-        return queryset
-
-class EventMinDateFilter(SimpleListFilter):
-    title = "Event start date"
-    parameter_name = "mindate"
-    query_arg = 'starts_at__gte'
-
-    def lookups(self, request, model_admin):
-        today = datetime.datetime.now().date()
-        firstdate = today - datetime.timedelta(days=4)
-        dates = [firstdate + datetime.timedelta(days=i) for i in range(30)]
-        return [ (d.strftime('%Y-%m-%d'),
-                  ('%s (today)' % d.strftime('%m/%d') if d==today else d.strftime('%m/%d')))
-                 for d in dates]
-
-    def queryset(self, request, queryset):
-        val = self.value()
-        if val:
-            kwargs = {self.query_arg: val}
-            queryset = queryset.filter(**kwargs)
         return queryset
