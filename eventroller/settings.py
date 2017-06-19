@@ -44,6 +44,7 @@ INSTALLED_APPS = (
     'reviewer',
     'event_exim',
     'event_review',
+    'rest_framework',
     'cachalot',
 )
 
@@ -79,6 +80,14 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'eventroller.wsgi.application'
 
+REST_FRAMEWORK = {
+    'DEFAULT_PAGINATION_CLASS': 'osdi.pagination.OsdiPagination',
+    'PAGE_SIZE': 5, # something low, so it's explicit, when bigger
+    'DEFAULT_RENDERER_CLASSES': (
+        'rest_framework.renderers.JSONRenderer',
+        'rest_framework.renderers.BrowsableAPIRenderer',
+    )
+}
 
 # Database
 # https://docs.djangoproject.com/en/1.8/ref/settings/#databases
@@ -129,7 +138,6 @@ elif DEBUG:
 
 
 EVENT_SOURCES = json.loads(os.environ.get('EVENT_SOURCES', '{}'))
-
 BASE_URL = os.environ.get('BASE_URL')
 
 EMAIL_HOST = os.environ.get('EMAIL_HOST', '')
