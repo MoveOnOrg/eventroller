@@ -55,10 +55,10 @@ class Connector:
                      'title', 'starts_at', 'ends_at', 'starts_at_utc', 'ends_at_utc', 'status', 'host_is_confirmed',
                      'is_private', 'is_approved', 'attendee_count', 'max_attendees',
                      'venue',
-                     'public_description', 'directions', 'note_to_attendees', 'notes',
+                     'public_description', 'directions', 'note_to_attendees',
                      'updated_at']
 
-    other_fields = ['ee.id', 'ee.creator_id', 'ee.campaign_id', 'ee.phone',
+    other_fields = ['ee.id', 'ee.creator_id', 'ee.campaign_id', 'ee.phone', 'ee.notes',
                     'ec.title', 'signuppage.name', 'createpage.name',
                     'u.id', 'u.first_name', 'u.last_name', 'u.email', 'loc.us_district', 'recentphone.value']
 
@@ -217,6 +217,7 @@ class Connector:
                              'osdi_origin_system': self.base_url,
                              'ticket_type': CHOICES['open'],
                              'share_url': search_url,
+                             'internal_notes': event_row[fi['ee.notes']],
                              #e.g. NC cong district 2 = "ocd-division/country:us/state:nc/cd:2"
                              'political_scope': (event_row[fi['political_scope']] or ocdep_location),
                              #'dupe_id': None, #no need to set it
@@ -288,7 +289,16 @@ class Connector:
                                                r.key, r.decision,
                                                eventfield_id=eventfields.get(r.key))
 
+    def get_admin_event_link(self, event):
+        if event.source_json_data:
+            cid = json.loads(event.source_json_data).get('campaign_id')
+            if cid:
+                return '{}/admin/events/event/?campaign={cid}&event_id={eid}'.format(
+                    self.base_url, cid=cid, eid=event.organization_source_pk)
+
     def get_host_event_link(self, event, edit_access=False):
+        if event.status != 'active':
+            return None
         jsondata = event.source_json_data
         create_page = None
         if jsondata:
