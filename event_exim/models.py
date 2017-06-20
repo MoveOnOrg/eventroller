@@ -6,6 +6,7 @@ from django.conf import settings
 from django.contrib.auth.models import User, Group
 from django.db import models
 from django.utils.functional import cached_property
+from django.db.models import Count
 # from django.db.models.signals import post_save
 # from django.dispatch import receiver
 
@@ -183,21 +184,71 @@ class EventDupeGuesses(models.Model):
         return dupe_event
     dupe_event_summary.short_description = 'Duplicate Event'
 
-# Currently doesn't handle the case where an event has more than one duplicate. 
-# Implementing this should wait until we have a clear use case for dupe_id on events
-# @receiver(post_save, sender = EventDupeGuesses, dispatch_uid = 'update_event_dupe')
-# def update_event_dupe_id(sender, instance, **kwargs):
-#     print("now in post save!")
-#     # yes, a duplicate
-#     if instance.decision == 2:
-#         instance.dupe_event.dupe_id = instance.source_event_id
-#         instance.dupe_event.save()
-#         print("recording dupe id %s on event %s" %(instance.source_event_id, instance.dupe_event.id))
-#     # undecided or not a duplicate
-#     elif instance.decision == 1 or instance.decision == 0 or instance.decision == None:
-#         instance.dupe_event.dupe_id = None
-#         instance.dupe_event.save()
-#         print("event %s dupe_id set to None" % instance.dupe_event.id)
+    @staticmethod
+    def get_potential_dupes():
+        """
+            Things that will muddle screening for duplicates:
+            * Bad data, e.g. zip code typos, errors converting local time to starts_at_utc.
+            * Missing data, e.g. virtual events with no zip code/location data
+        """
+        return (
+            Event.objects.values('zip','starts_at_utc')
+            .annotate(count = Count('id'))
+            .order_by()
+            .filter(
+                count__gt = 1,
+                dupe_id__isnull = True,
+                zip__isnull = False,
+                starts_at_utc__isnull = False,
+                status = 'active'
+            )
+        )
+
+    @staticmethod    
+    def record_potential_dupes(potential_dupes):
+        for dupe in potential_dupes:
+            events = (
+                Event.objects
+                .filter(zip = dupe['zip'], starts_at_utc = dupe['starts_at_utc'])
+                .order_by('id')
+            )
+            for x in range(dupe['count']):
+                for y in range(x-1):
+                    source_event = events[x]
+                    dupe_event = events[y]
+                    try:
+                        (
+                            EventDupeGuesses.objects
+                            .create(
+                                source_event = source_event, 
+                                dupe_event = dupe_event, 
+                                decision = 0
+                            )
+                        )
+                        print (
+                            "Documented duplicate guess: Events {} and {}"
+                            .format(source_event.id, dupe_event.id)
+                        )
+                    except:
+                        print (
+                            "Duplicate event guess for {} and {} already documented"
+                            .format(source_event.id, dupe_event.id)
+                        )
+    # Currently doesn't handle the case where an event has more than one duplicate. 
+    # Implementing this should wait until we have a clear use case for dupe_id on events
+    # @receiver(post_save, sender = EventDupeGuesses, dispatch_uid = 'update_event_dupe')
+    # def update_event_dupe_id(sender, instance, **kwargs):
+    #     print("now in post save!")
+    #     # yes, a duplicate
+    #     if instance.decision == 2:
+    #         instance.dupe_event.dupe_id = instance.source_event_id
+    #         instance.dupe_event.save()
+    #         print("recording dupe id %s on event %s" %(instance.source_event_id, instance.dupe_event.id))
+    #     # undecided or not a duplicate
+    #     elif instance.decision == 1 or instance.decision == 0 or instance.decision == None:
+    #         instance.dupe_event.dupe_id = None
+    #         instance.dupe_event.save()
+    #         print("event %s dupe_id set to None" % instance.dupe_event.id)
 
 
 class Org2OrgShare(models.Model):
