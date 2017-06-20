@@ -8,6 +8,24 @@ from huerta.filters import (CollapsedListFilter,
 from event_store.models import EVENT_REVIEW_CHOICES, Event
 
 
+class SortingFilter(CollapsedSimpleListFilter):
+    title = "Sorting"
+    parameter_name = "sorting"
+    multiselect_enabled = False
+
+    def lookups(self, request, model_admin):
+        return (('-created_at', 'Recently created'),
+                ('starts_at', 'Earliest'),
+                ('-max_attendees', 'Largest max attendees'),
+                ('-attendee_count', 'Most attendee signups'),
+                ('zip', 'Zipcode'),
+        )
+
+    def queryset(self, request, queryset):
+        val = self.value()
+        return queryset.order_by(val) if val else queryset
+
+
 class ReviewFilter(CollapsedListFilter):
 
     def __init__(self, *args, **kw):

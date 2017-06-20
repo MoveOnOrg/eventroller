@@ -11,7 +11,8 @@ from event_review.filters import (CollapsedListFilter,
                                   EventAttendeeCountFilter,
                                   EventFullness,
                                   PoliticalScopeFilter,
-                                  ReviewFilter)
+                                  ReviewFilter,
+                                  SortingFilter)
 
 def phone_format(phone):
     return format_html('<span style="white-space: nowrap">{}</span>',
@@ -117,7 +118,8 @@ class EventAdmin(admin.ModelAdmin):
                    ('host_is_confirmed', CollapsedListFilter),
                    EventAttendeeMaxFilter,
                    EventAttendeeCountFilter,
-                   EventFullness)
+                   EventFullness,
+                   SortingFilter)
     list_display_links = None
 
     def get_actions(self, request):
