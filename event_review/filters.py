@@ -1,10 +1,9 @@
+import datetime
 from django.contrib.admin.filters import (AllValuesFieldListFilter,
                                           RelatedFieldListFilter,
                                           SimpleListFilter)
 from django.db.models import Q
-from huerta.filters import (CollapsedListFilter,
-                            CollapsedListFilterMixin,
-                            CollapsedSimpleListFilter)
+from huerta.filters import CollapsedListFilter, CollapsedSimpleListFilter
 from event_store.models import EVENT_REVIEW_CHOICES, Event
 
 
@@ -68,7 +67,7 @@ class EventAttendeeMaxFilter(CollapsedSimpleListFilter):
 
 
 class EventAttendeeCountFilter(EventAttendeeMaxFilter):
-    title = "Attendee count"
+    title = "Attending RSVP count"
     parameter_name = "attending"
     query_arg = 'attendee_count__range'
 
@@ -79,7 +78,7 @@ class EventFullness(CollapsedSimpleListFilter):
     multiselect_enabled = False
 
     def lookups(self, request, model_admin):
-        return ((0.9, '90% full'),
+        return ((0.9, '90%+ full'),
                 (1.0, 'full'))
 
     def queryset(self, request, queryset):
@@ -90,3 +89,23 @@ class EventFullness(CollapsedSimpleListFilter):
                 params=[float(val)]
             )
         return queryset
+
+
+class EventMinDateFilter(CollapsedSimpleListFilter):
+    title = "events starting on or after"
+    parameter_name = "mindate"
+    query_arg = 'starts_at__gte'
+    multiselect_enabled = False
+
+    def lookups(self, request, model_admin):
+        today = datetime.datetime.now().date()
+        firstdate = today - datetime.timedelta(days=4)
+        dates = [firstdate + datetime.timedelta(days=i) for i in range(30)]
+        return [ (d.strftime('%Y-%m-%d'),
+                  ('%s (today)' % d.strftime('%m/%d') if d==today else d.strftime('%m/%d')))
+                 for d in dates]
+
+class EventMaxDateFilter(EventMinDateFilter):
+    title = "events starting on or before"
+    parameter_name = "maxdate"
+    query_arg = 'starts_at__lte'

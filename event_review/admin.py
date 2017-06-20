@@ -10,9 +10,12 @@ from event_review.filters import (CollapsedListFilter,
                                   EventAttendeeMaxFilter,
                                   EventAttendeeCountFilter,
                                   EventFullness,
+                                  EventMaxDateFilter,
+                                  EventMinDateFilter,
                                   PoliticalScopeFilter,
                                   ReviewFilter,
                                   SortingFilter)
+
 
 def phone_format(phone):
     return format_html('<span style="white-space: nowrap">{}</span>',
@@ -112,7 +115,7 @@ class EventAdmin(admin.ModelAdmin):
                    ('state', CollapsedListFilter),
                    ('political_scope', PoliticalScopeFilter),
                    ('is_private', CollapsedListFilter),
-                   ('starts_at', CollapsedListFilter),
+                   EventMinDateFilter,EventMaxDateFilter,
                    ('ends_at', CollapsedListFilter),
                    ('status', CollapsedListFilter),
                    ('host_is_confirmed', CollapsedListFilter),
