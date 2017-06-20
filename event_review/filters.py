@@ -5,7 +5,7 @@ from django.db.models import Q
 from huerta.filters import (CollapsedListFilter,
                             CollapsedListFilterMixin,
                             CollapsedSimpleListFilter)
-from event_store.models import EVENT_REVIEW_CHOICES
+from event_store.models import EVENT_REVIEW_CHOICES, Event
 
 
 class ReviewFilter(CollapsedListFilter):
@@ -14,6 +14,10 @@ class ReviewFilter(CollapsedListFilter):
         CollapsedListFilter.__init__(self, *args, **kw)
         self.empty_value_display = "New"
 
+
+class PoliticalScopeFilter(CollapsedListFilter):
+    def get_display_value(self, val):
+        return Event.political_scope_display(val)
 
 
 class EventAttendeeMaxFilter(CollapsedSimpleListFilter):
@@ -32,7 +36,6 @@ class EventAttendeeMaxFilter(CollapsedSimpleListFilter):
 
     def queryset(self, request, queryset):
         val = self.value()
-        self.lookup_val = val
         if val:
             arg = self.query_arg
             query = None
@@ -63,7 +66,6 @@ class EventFullness(CollapsedSimpleListFilter):
 
     def queryset(self, request, queryset):
         val = self.value()
-        self.lookup_val = val
         if val:
             queryset = queryset.extra(
                 where=['max_attendees > 0 AND attendee_count/max_attendees >= %s'],

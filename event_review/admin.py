@@ -10,6 +10,7 @@ from event_review.filters import (CollapsedListFilter,
                                   EventAttendeeMaxFilter,
                                   EventAttendeeCountFilter,
                                   EventFullness,
+                                  PoliticalScopeFilter,
                                   ReviewFilter)
 
 def phone_format(phone):
@@ -39,7 +40,7 @@ def host_format(event):
     return mark_safe(''.join(host_items))
 
 def event_list_display(obj, onecol=False):
-    scope = obj.political_scope_display()
+    scope = obj.get_political_scope_display()
     if scope:
         scope = ' ({})'.format(scope)
     second_col = ''
@@ -108,6 +109,7 @@ class EventAdmin(admin.ModelAdmin):
                    ('organization_status_review', ReviewFilter),
                    ('organization_status_prep', CollapsedListFilter),
                    ('state', CollapsedListFilter),
+                   ('political_scope', PoliticalScopeFilter),
                    ('is_private', CollapsedListFilter),
                    ('starts_at', CollapsedListFilter),
                    ('ends_at', CollapsedListFilter),
