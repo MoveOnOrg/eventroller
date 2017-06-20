@@ -18,6 +18,7 @@ from event_review.filters import (CollapsedListFilter,
                                   ReviewFilter,
                                   SortingFilter)
 
+from huerta.filters import CollapsedListFilter, textinputfilter_factory
 
 def phone_format(phone):
     return format_html('<span style="white-space: nowrap">{}</span>',
@@ -123,7 +124,18 @@ class EventAdmin(admin.ModelAdmin):
                    EventAttendeeMaxFilter,
                    EventAttendeeCountFilter,
                    EventFullness,
-                   SortingFilter)
+                   SortingFilter,
+                   textinputfilter_factory('Title',
+                                           'title'),
+                   textinputfilter_factory('Host Email',
+                                           'organization_host__email'),
+                   textinputfilter_factory('Host Name',
+                                           'organization_host__name'),
+                   textinputfilter_factory('City',
+                                           'city'),
+                   textinputfilter_factory('Zip',
+                                           'zip'),)
+
     list_display_links = None
 
     def get_actions(self, request):

@@ -157,7 +157,7 @@ class Event(models.Model):
     #duration: {type: GraphQLInt},
     is_searchable = models.IntegerField(choices=((0, 'not searchable'), (1, 'searchable')))
     private_phone = models.CharField(max_length=765, blank=True)
-    
+
     #?todo
     #hostReceiveRsvpEmails: {type: GraphQLBoolean},
     #rsvpUseReminderEmail: {type: GraphQLBoolean},
