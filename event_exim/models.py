@@ -25,6 +25,7 @@ CRM_TYPES = {
 
 
 class EventSource(models.Model):
+
     """
     This represents a source of data to fill event_store.models.Event
 
