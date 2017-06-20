@@ -12,6 +12,8 @@ from django.db.models import Count
 
 from event_store.models import Activist, Event, Organization
 from event_exim import connectors
+from event_review.admin import event_list_display
+
 
 
 CRM_TYPES = {
@@ -154,36 +156,14 @@ class EventDupeGuesses(models.Model):
     class Meta:
         unique_together = (('source_event','dupe_event'),)
   
-    def source_event_summary(self):
-        source_event = '{} (source ID: {}): {}. {}, {}, {}, {}. "{}". RSVP: {}'.format(
-            self.source_event.id,
-            self.source_event.organization_source_pk,
-            self.source_event.title,
-            self.source_event.venue,
-            self.source_event.address1,
-            self.source_event.city,
-            self.source_event.state,
-            self.source_event.public_description,
-            str(self.source_event.rsvp_url)
-        )
-        return source_event
-    source_event_summary.short_description = 'Original Event'
+    def source_event_list_display(self):
+        return event_list_display(self.source_event, onecol=True)
+    source_event_list_display.short_description = "Original Event"
 
-    def dupe_event_summary(self):
-        dupe_event = '{} (source ID: {}): {}. {}, {}, {}, {}. "{}". RSVP at {}'.format(
-            self.dupe_event.id,
-            self.dupe_event.organization_source_pk,
-            self.dupe_event.title,
-            self.dupe_event.venue,
-            self.dupe_event.address1,
-            self.dupe_event.city,
-            self.dupe_event.state,
-            self.dupe_event.public_description,
-            str(self.dupe_event.rsvp_url)
-        )
-        return dupe_event
-    dupe_event_summary.short_description = 'Duplicate Event'
-
+    def dupe_event_list_display(self):
+        return event_list_display(self.dupe_event, onecol=True)
+    dupe_event_list_display.short_description = 'Duplicate Event'
+    
     @staticmethod
     def get_potential_dupes():
         """
