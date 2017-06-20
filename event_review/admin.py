@@ -118,7 +118,6 @@ class EventAdmin(admin.ModelAdmin):
                    ('political_scope', PoliticalScopeFilter),
                    IsPrivateFilter,
                    EventMinDateFilter,EventMaxDateFilter,
-                   ('ends_at', CollapsedListFilter),
                    ('status', CollapsedListFilter),
                    HostConfirmationFilter,
                    EventAttendeeMaxFilter,
