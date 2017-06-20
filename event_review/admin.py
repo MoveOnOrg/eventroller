@@ -6,7 +6,13 @@ from django.utils.html import format_html, mark_safe
 
 from event_store.models import Event
 from reviewer.filters import ReviewerOrganizationFilter, review_widget
-from event_review.filters import CollapsedListFilter, ReviewFilter
+from event_review.filters import (CollapsedListFilter,
+                                  EventAttendeeMaxFilter,
+                                  EventAttendeeCountFilter,
+                                  EventFullness,
+                                  PoliticalScopeFilter,
+                                  ReviewFilter,
+                                  SortingFilter)
 
 def phone_format(phone):
     return format_html('<span style="white-space: nowrap">{}</span>',
@@ -35,7 +41,7 @@ def host_format(event):
     return mark_safe(''.join(host_items))
 
 def event_list_display(obj, onecol=False):
-    scope = obj.political_scope_display()
+    scope = obj.get_political_scope_display()
     if scope:
         scope = ' ({})'.format(scope)
     second_col = ''
@@ -104,12 +110,16 @@ class EventAdmin(admin.ModelAdmin):
                    ('organization_status_review', ReviewFilter),
                    ('organization_status_prep', CollapsedListFilter),
                    ('state', CollapsedListFilter),
+                   ('political_scope', PoliticalScopeFilter),
                    ('is_private', CollapsedListFilter),
                    ('starts_at', CollapsedListFilter),
                    ('ends_at', CollapsedListFilter),
-                   ('attendee_count', CollapsedListFilter),
                    ('status', CollapsedListFilter),
-                   ('host_is_confirmed', CollapsedListFilter))
+                   ('host_is_confirmed', CollapsedListFilter),
+                   EventAttendeeMaxFilter,
+                   EventAttendeeCountFilter,
+                   EventFullness,
+                   SortingFilter)
     list_display_links = None
 
     def get_actions(self, request):

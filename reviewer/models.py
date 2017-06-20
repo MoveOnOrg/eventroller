@@ -26,6 +26,8 @@ class ReviewGroup(models.Model):
     organization = models.ForeignKey(Organization, db_index=True)
     group = models.ForeignKey(Group, db_index=True)
 
+    class Meta:
+        unique_together = ('organization', 'group')
 
     @classmethod
     def org_groups(cls, organization_slug):
@@ -40,6 +42,9 @@ class ReviewGroup(models.Model):
     @classmethod
     def user_review_groups(cls, user):
         return ReviewGroup.objects.filter(group__user=user)
+
+    def __str__(self):
+        return '{} for {}'.format(self.group, self.organization)
 
 class Review(models.Model):
     content_type = models.ForeignKey(ContentType,

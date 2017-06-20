@@ -214,16 +214,20 @@ class Event(models.Model):
             'prep_status': self.organization_status_prep,
         }
 
-    def political_scope_display(self):
-        if self.political_scope:
+    @classmethod
+    def political_scope_display(cls, political_scope):
+        if political_scope:
             m = re.match(
                 r'ocd-division/country:(?P<country>\w+)/\w+:(?P<region>\w+)/(?P<district_type>\w+):(?P<district>\w+)',
-                self.political_scope)
+                political_scope)
             if m:
                 return '{}_{}'.format(m.group('region').upper(), m.group('district').upper())
             else:
-                return self.political_scope
+                return political_scope
         return ''
+
+    def get_political_scope_display(self):
+        return self.political_scope_display(self.political_scope)
 
     def on_save_review(self, reviews, log_message=None):
         """
