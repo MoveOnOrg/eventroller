@@ -23,7 +23,7 @@ class EventAttendeeMaxFilter(CollapsedSimpleListFilter):
 
     def lookups(self, request, model_admin):
         # avoid commas which might be used by multi-choice marker
-        return (('0-10', '-10'),
+        return (('0-10', '0-10'),
                 ('10-49', '10-49'),
                 ('50-99', '50-99'),
                 ('100-199', '100-199'),
@@ -63,9 +63,10 @@ class EventFullness(CollapsedSimpleListFilter):
 
     def queryset(self, request, queryset):
         val = self.value()
+        self.lookup_val = val
         if val:
             queryset = queryset.extra(
-                where=['max_attendees > 0 AND (attendee_count/max_attendees > %s)'],
-                params=[val]
+                where=['max_attendees > 0 AND attendee_count/max_attendees >= %s'],
+                params=[float(val)]
             )
         return queryset
