@@ -12,4 +12,5 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         dupes = EventDupeGuesses.get_potential_dupes()
         if dupes:
-            EventDupeGuesses.record_potential_dupes(dupes)
+            log = EventDupeGuesses.record_potential_dupes(dupes)
+            # print(log)

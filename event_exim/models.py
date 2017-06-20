@@ -202,10 +202,12 @@ class EventDupeGuesses(models.Model):
                 starts_at_utc__isnull = False,
                 status = 'active'
             )
+            .exclude(zip='')
         )
 
     @staticmethod    
     def record_potential_dupes(potential_dupes):
+        message = 'Recording new potential duplicate events: \n'
         for dupe in potential_dupes:
             events = (
                 Event.objects
@@ -213,27 +215,26 @@ class EventDupeGuesses(models.Model):
                 .order_by('id')
             )
             for x in range(dupe['count']):
-                for y in range(x-1):
+                for y in range(x+1,dupe['count']):
                     source_event = events[x]
                     dupe_event = events[y]
-                    try:
-                        (
-                            EventDupeGuesses.objects
-                            .create(
-                                source_event = source_event, 
-                                dupe_event = dupe_event, 
-                                decision = 0
-                            )
-                        )
-                        print (
-                            "Documented duplicate guess: Events {} and {}"
+                    answer = EventDupeGuesses.objects.get_or_create(
+                        source_event = source_event, 
+                        dupe_event = dupe_event, 
+                        decision = 0
+                    )
+                    if not answer[1]:
+                        message += (
+                            "Duplicate event guess for {} and {} already recorded \n"
                             .format(source_event.id, dupe_event.id)
                         )
-                    except:
-                        print (
-                            "Duplicate event guess for {} and {} already documented"
+                    else:       
+                        message += (
+                            "Recorded duplicate guess: Events {} and {} \n"
                             .format(source_event.id, dupe_event.id)
                         )
+        return message
+
     # Currently doesn't handle the case where an event has more than one duplicate. 
     # Implementing this should wait until we have a clear use case for dupe_id on events
     # @receiver(post_save, sender = EventDupeGuesses, dispatch_uid = 'update_event_dupe')
