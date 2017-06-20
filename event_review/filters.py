@@ -37,6 +37,27 @@ class PoliticalScopeFilter(CollapsedListFilter):
         return Event.political_scope_display(val)
 
 
+class IsPrivateFilter(CollapsedSimpleListFilter):
+    title = "Private or public"
+    parameter_name = 'is_private'
+    query_arg = 'is_private'
+    multiselect_enabled = False
+
+    def lookups(self, request, model_admin):
+        return ((0, 'public'),
+                (1, 'private'))
+
+class HostConfirmationFilter(CollapsedSimpleListFilter):
+    title = "Host confirmation"
+    parameter_name = 'host_confirmed'
+    query_arg = 'host_is_confirmed'
+    multiselect_enabled = False
+
+    def lookups(self, request, model_admin):
+        return ((0, 'unconfirmed'),
+                (1, 'confirmed'))
+
+
 class EventAttendeeMaxFilter(CollapsedSimpleListFilter):
     title = "Max attendees"
     parameter_name = "maxattendees"
