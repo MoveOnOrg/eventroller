@@ -4,7 +4,6 @@ import time
 
 from django.conf import settings
 from django.contrib.auth.models import User, Group
-from django.contrib.postgres.fields import JSONField
 from django.db import models
 from django.utils.functional import cached_property
 # from django.db.models.signals import post_save
@@ -26,19 +25,20 @@ CRM_TYPES = {
 
 
 class EventSource(models.Model):
+
     """
     This represents a source of data to fill event_store.models.Event
 
     One question is how best to connect an eventsource to the Event
-
+   
     """
     name = models.CharField(max_length=128, help_text="e.g. campaign or just describe the system")
-    origin_organization = models.ForeignKey(Organization)
+    origin_organization = models.ForeignKey(Organization, related_name='source')
     osdi_name = models.CharField(max_length=765)
 
     crm_type = models.CharField(max_length=16, choices=[(k,k) for k in CRM_TYPES])
 
-    crm_data = JSONField(null=True, blank=True)
+    crm_data = models.TextField(null=True, blank=True)
 
     #(provided: ping url for update (put this on your thanks page for event creation)
     update_style = models.IntegerField(choices=(
@@ -59,8 +59,8 @@ class EventSource(models.Model):
     @property
     def data(self):
         """
-            Canonical data for this record -- sometimes this can be loaded from settings
-            so that the database doesn't need to store a password in plaintext
+        Canonical data for this record -- sometimes this can be loaded from settings
+        so that the database doesn't need to store a password in plaintext
         """
         settings_data = getattr(settings, 'EVENT_SOURCES', {})
         return settings_data.get(self.name, self.crm_data)
@@ -71,14 +71,14 @@ class EventSource(models.Model):
             connector_module = importlib.import_module('event_exim.connectors.%s' % self.crm_type)
             return connector_module.Connector(self)
 
-    def update_events(self, update_since=None):
+    def update_events(self, last_update=None):
         """
         Sync events from source to local database
         """
         # 1. load events from our connector
-        if update_since is None:
-            update_since = self.last_update
-        event_data = self.api.load_events(last_updated=update_since)
+        if last_update is None:
+            last_update = self.last_update
+        event_data = self.api.load_events(last_updated=last_update)
 
         all_events = {str(e['organization_source_pk']):e for e in event_data['events']}
         new_host_ids = set([e['organization_host'].member_system_pk for e in all_events.values()])
@@ -98,9 +98,11 @@ class EventSource(models.Model):
                     for hf in host_update_fields:
                         if getattr(host_by_pk, hf) != getattr(ehost, hf):
                             ehost.save()
+                            existing_hosts[ehost.member_system_pk] = ehost
                             break #inner loop
                 else:
                     ehost.save()
+                    existing_hosts[ehost.member_system_pk] = ehost
 
         # 3. bulk-create all new events not in the system yet
         existing_ids = set([e.organization_source_pk for e in existing])
@@ -129,6 +131,12 @@ class EventSource(models.Model):
         if changed:
             event.save()
         return changed
+
+class EventDupeManager(models.Manager):
+    def create_event_dupe(self, source_event, dupe_event):
+        event_dupe = self.create(source_event = source_event, dupe_event = dupe_event, decision = 0)
+        event_dupe.save()
+        return event_dupe.id
 
 class EventDupeGuesses(models.Model):
     source_event = models.ForeignKey(Event, related_name='dupe_guesses')
@@ -193,16 +201,16 @@ class EventDupeGuesses(models.Model):
 
 
 class Org2OrgShare(models.Model):
-    event_source = models.ForeignKey(EventSource, related_name='share_sources')
-    event_sink = models.ForeignKey(EventSource, related_name='share_sinks')
+  event_source = models.ForeignKey(EventSource, related_name='share_sources')
+  event_sink = models.ForeignKey(EventSource, related_name='share_sinks')
 
-    status = models.IntegerField(choices=( (-1, 'disabled'),
-                                           (0, 'offered'),
-                                           (1, 'enabled')))
+  status = models.IntegerField(choices=( (-1, 'disabled'),
+                                         (0, 'offered'),
+                                         (1, 'enabled')))
 
-    filters = JSONField(null=True, blank=True)
+  filters = models.TextField(null=True, blank=True)
 
-    created_at = models.DateTimeField(auto_now_add=True)
-    modified_at = models.DateTimeField(auto_now=True)
+  created_at = models.DateTimeField(auto_now_add=True)
+  modified_at = models.DateTimeField(auto_now=True)
 
-    creator = models.ForeignKey(User)
+  creator = models.ForeignKey(User)

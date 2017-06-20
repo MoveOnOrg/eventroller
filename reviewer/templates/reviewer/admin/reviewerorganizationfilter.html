@@ -18,6 +18,9 @@
                                    jQuery: window.jQuery || django.jQuery,
                                    pollRate: {{spec.poll_rate}},
                                    apiPath: "{{spec.get_path}}"
-                                  })).start();
+                                  }));
+  (window.jQuery || django.jQuery)(function() {
+    setTimeout(reviewState.start, 0);
+  });
 </script>
 {% endif %}

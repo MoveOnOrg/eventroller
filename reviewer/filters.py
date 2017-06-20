@@ -9,8 +9,12 @@ from django.utils.html import format_html, conditional_escape
 from event_store.models import Organization, EVENT_REVIEW_CHOICES, EVENT_PREP_CHOICES
 from reviewer.models import ReviewGroup
 
-def review_widget(obj):
-    return format_html('<div class="review" data-pk="{}"></div>', obj.id)
+def review_widget(obj, subject_id=None):
+    return format_html('<div class="review" data-pk="{}" {}></div>',
+                       obj.id,
+                       format_html('data-subject="{}"', subject_id)
+                       if subject_id is not None else '')
+
 
 class ReviewerOrganizationFilter(SimpleListFilter):
     template = "reviewer/admin/reviewerorganizationfilter.html"
@@ -55,7 +59,7 @@ class ReviewerOrganizationFilter(SimpleListFilter):
         # we need this to save the right content type with the review api
         self.content_type = ContentType.objects.get_for_model(model_admin.model)
         user = request.user
-        return ReviewGroup.user_review_groups(request.user).values_list('organization_id', 'organization__title')
+        return list(set(ReviewGroup.user_review_groups(request.user).values_list('organization_id', 'organization__title')))
 
     def queryset(self, request, queryset):
         org = self.value()

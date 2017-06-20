@@ -1,9 +1,11 @@
 import datetime
 from itertools import chain
+import json
 import re
 
 from actionkit.api.event import AKEventAPI
 from actionkit.api.user import AKUserAPI
+from actionkit.utils import generate_akid
 from event_store.models import Activist, Event, CHOICES
 
 """
@@ -21,6 +23,8 @@ Non-standard use in ActionKit:
 
 #MYSQL 2016-12-12 18:00:00
 DATE_FMT = '%Y-%m-%d %H:%M:%S'
+
+_LOGIN_TOKENS = {}
 
 class AKAPI(AKUserAPI, AKEventAPI):
     #merge both user and event apis in one class
@@ -51,11 +55,11 @@ class Connector:
                      'title', 'starts_at', 'ends_at', 'starts_at_utc', 'ends_at_utc', 'status', 'host_is_confirmed',
                      'is_private', 'is_approved', 'attendee_count', 'max_attendees',
                      'venue',
-                     'public_description', 'directions', 'note_to_attendees', 'notes',
+                     'public_description', 'directions', 'note_to_attendees',
                      'updated_at']
 
-    other_fields = ['ee.id', 'ee.creator_id', 'ee.campaign_id', 'ee.phone',
-                    'ec.title', 'signuppage.name',
+    other_fields = ['ee.id', 'ee.creator_id', 'ee.campaign_id', 'ee.phone', 'ee.notes',
+                    'ec.title', 'signuppage.name', 'createpage.name',
                     'u.id', 'u.first_name', 'u.last_name', 'u.email', 'loc.us_district', 'recentphone.value']
 
     event_fields = ['review_status', 'prep_status',
@@ -79,8 +83,10 @@ class Connector:
         " LEFT JOIN core_user u ON (u.id = host.user_id)"
         " LEFT JOIN core_userfield recentphone ON (recentphone.parent_id = u.id AND recentphone.name = 'recent_phone')"
         " LEFT JOIN core_location loc ON (loc.user_id = u.id)"
-        " JOIN core_eventsignuppage ces ON (ces.campaign_id = ec.id)"
-        " JOIN core_page signuppage ON (signuppage.id = ces.page_ptr_id AND signuppage.hidden=0)"
+        " JOIN core_eventsignuppage ces ON (ces.campaign_id = ee.campaign_id)"
+        " JOIN core_page signuppage ON (signuppage.id = ces.page_ptr_id AND signuppage.hidden=0 AND signuppage.status='active')"
+        " LEFT JOIN core_eventcreatepage cec ON (cec.campaign_id = ee.campaign_id)"
+        " LEFT JOIN core_page createpage ON (createpage.id = cec.page_ptr_id AND createpage.hidden=0 AND createpage.status='active')"
         " %(eventjoins)s "
         " xxADDITIONAL_WHERExx " #will be replaced with text or empty string on run
         " GROUP BY ee.id" #make sure events are unique (might arbitrarily choose signup page, if multiple)
@@ -117,7 +123,12 @@ class Connector:
                 'ignore_host_ids': {'help_text': ('if you want to ignore certain hosts'
                                                   ' (due to automation/admin status) add'
                                                   ' them as a json list of integers'),
-                                    'required': False}
+                                    'required': False},
+                'cohost_id': {'help_text': ('for easy Act-as-host links, if all events'
+                                            ' have a cohost, then this will create'
+                                            ' links that do not need ActionKit staff access'),
+                              'required': False}
+
         }
 
     def __init__(self, event_source):
@@ -132,6 +143,7 @@ class Connector:
             AK_SECRET = data.get('ak_secret')
         self.akapi = AKAPI(aksettings)
         self.ignore_hosts = data['ignore_host_ids'] if 'ignore_host_ids' in data else []
+        self.cohost_id = data.get('cohost_id')
 
     def _load_events_from_sql(self, ordering='ee.updated_at', max_results=10000, offset=0,
                     excludes=[], additional_where=[], additional_params={}):
@@ -205,6 +217,7 @@ class Connector:
                              'osdi_origin_system': self.base_url,
                              'ticket_type': CHOICES['open'],
                              'share_url': search_url,
+                             'internal_notes': event_row[fi['ee.notes']],
                              #e.g. NC cong district 2 = "ocd-division/country:us/state:nc/cd:2"
                              'political_scope': (event_row[fi['political_scope']] or ocdep_location),
                              #'dupe_id': None, #no need to set it
@@ -215,6 +228,11 @@ class Connector:
                              'event_facebook_url': None,
                              'organization_status_review': event_row[fi['review_status']],
                              'organization_status_prep': event_row[fi['prep_status']],
+                             'source_json_data': json.dumps({
+                                 # other random data to keep around
+                                 'campaign_id': event_row[fi['ee.campaign_id']],
+                                 'create_page': event_row[fi['createpage.name']],
+                             }),
                          })
         for df in self.date_fields:
             if event_fields[df]:
@@ -271,6 +289,32 @@ class Connector:
                                                r.key, r.decision,
                                                eventfield_id=eventfields.get(r.key))
 
-    def get_host_event_link(self, event):
-        #might include a temporary token
-        pass
+    def get_admin_event_link(self, event):
+        if event.source_json_data:
+            cid = json.loads(event.source_json_data).get('campaign_id')
+            if cid:
+                return '{}/admin/events/event/?campaign={cid}&event_id={eid}'.format(
+                    self.base_url, cid=cid, eid=event.organization_source_pk)
+
+    def get_host_event_link(self, event, edit_access=False):
+        if event.status != 'active':
+            return None
+        jsondata = event.source_json_data
+        create_page = None
+        if jsondata:
+            create_page = json.loads(jsondata).get('create_page')
+        if not create_page:
+            return None
+
+        host_link = '/event/{create_page}/{event_id}/host/'.format(
+            create_page=create_page,
+            event_id=event.organization_source_pk)
+        if edit_access and self.cohost_id and self.akapi.secret:
+            #easy memoization for a single user
+            token = _LOGIN_TOKENS.get(self.cohost_id, False)
+            if token is False:
+                token = self.akapi.login_token(self.cohost_id)
+                _LOGIN_TOKENS[self.cohost_id] = token
+            if token:
+                host_link = '/login/?i={}&l=1&next={}'.format(token, host_link)
+        return '{}{}'.format(self.base_url, host_link)

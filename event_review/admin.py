@@ -1,35 +1,91 @@
+import re
+
 from django.contrib import admin
 from django import forms
 from django.utils.html import format_html, mark_safe
 
 from event_store.models import Event
 from reviewer.filters import ReviewerOrganizationFilter, review_widget
-from huerta.filters import CollapsedListFilter
+from event_review.filters import CollapsedListFilter, ReviewFilter
 
-def event_list_display(obj):
+def phone_format(phone):
+    return format_html('<span style="white-space: nowrap">{}</span>',
+                       re.sub(r'^(\d{3})(\d{3})(\d{4})', '(\\1) \\2-\\3',
+                              phone))
+
+def host_format(event):
+    host_items = []
+    host = event.organization_host
+    if not getattr(host, 'email', None):
+        host_items.append(str(host))
+    else:
+        host_items.append(format_html('<a data-system-pk="{}" href="mailto:{}">{}</a>',
+                                      host.member_system_pk or '',
+                                      host.email,
+                                      host))
+
+    if event.host_is_confirmed:
+        host_items.append(mark_safe(' (<span style="color:green">confirmed</span>) '))
+    else:
+        host_items.append(mark_safe(' (<span style="color:red">unconfirmed</span>) '))
+
+    host_link = event.host_edit_url(edit_access=True)
+    if host_link:
+        host_items.append(format_html('<a href="{}">Act as host</a>', host_link))
+    return mark_safe(''.join(host_items))
+
+def event_list_display(obj, onecol=False):
+    scope = obj.political_scope_display()
+    if scope:
+        scope = ' ({})'.format(scope)
+    second_col = ''
+    if not onecol:
+        second_col = format_html("""
+          <div class="col-md-6">
+            <div><b>Private Phone:</b> {private_phone}</div>
+            <div><b>Event Status:</b> {active_status}</div>
+            {review_widget}
+          </div>
+        """,
+        private_phone=phone_format(obj.private_phone),
+        active_status=obj.status,
+        review_widget=review_widget(obj, obj.organization_host_id)
+        )
     return format_html("""
         <div class="row">
             <div class="col-md-6">
-                <h5>{title}</h5>
+                <h5>{title} ({pk})</h5>
                 {private}
                 <div><b>Host:</b> {host}</div>
-                <div><b>Venue:</b> {venue}</div>
+                <div><b>Where:</b>{political_scope}
+                    <div>{venue}</div>
+                    <div>{address}</div>
+                    <div>{city}, {state}</div>
+                </div>
+                <div><b>When:</b> {when}</div>
+                <div><b>Attendees:</b> {attendee_count}{max_attendees}</div>
                 <div><b>Description</b> {description}</div>
             </div>
-            <div class="col-md-6">
-                <div><b>Event Status:</b> {active_status}</div>
-                {review_widget}
-            </div>
+            {second_col}
         </div>
         """,
         title=obj.title,
+        pk=obj.organization_source_pk,
         venue=obj.venue,
-        private=mark_safe('<div class="alert alert-danger">Private</div>') if obj.is_private else '',
-        host=obj.organization_host,
+        address='%s %s' % (obj.address1, obj.address2),
+        city=obj.city,
+        state=obj.state,
+        political_scope=scope,
+        when=obj.starts_at.strftime('%c'),
+        attendee_count=obj.attendee_count,
+        max_attendees='/%s' % obj.max_attendees
+                      if obj.max_attendees else '',
+        private=mark_safe('<div class="label label-danger">Private</div>')
+                if obj.is_private else '',
+        host=host_format(obj),
+        second_col=second_col,
         #review_status=obj.organization_status_review,
         #prep_status=obj.organization_status_prep,
-        active_status=obj.status,
-        review_widget=review_widget(obj),
         #notes=mark_safe('<textarea rows="5" class="form-control" readonly>%s</textarea>' % obj.notes)
         #    if obj.notes else None,
         description = mark_safe('<textarea rows="5" class="form-control" readonly>%s</textarea>' % obj.public_description)
@@ -37,13 +93,15 @@ def event_list_display(obj):
 
 @admin.register(Event)
 class EventAdmin(admin.ModelAdmin):
-
+    change_list_template = "admin/change_list_filters_top.html" #part of huerta
+    filters_collapsable = True
+    filters_require_submit = True
     disable_list_headers = True
     list_striped = True
     list_display = (event_list_display,)
     list_filter = (ReviewerOrganizationFilter,
                    ('organization_campaign', CollapsedListFilter),
-                   ('organization_status_review', CollapsedListFilter),
+                   ('organization_status_review', ReviewFilter),
                    ('organization_status_prep', CollapsedListFilter),
                    ('state', CollapsedListFilter),
                    ('is_private', CollapsedListFilter),
@@ -56,7 +114,8 @@ class EventAdmin(admin.ModelAdmin):
 
     def get_actions(self, request):
         actions = super(EventAdmin, self).get_actions(request)
-        del actions['delete_selected']
+        if 'delete_selected' in actions:
+            del actions['delete_selected']
         return actions
 
     def has_delete_permission(self, request, obj=None):
@@ -64,3 +123,8 @@ class EventAdmin(admin.ModelAdmin):
 
     def has_add_permission(self, request, obj=None):
         return False
+
+    def get_queryset(self, *args, **kw):
+        qs = super(EventAdmin, self).get_queryset(*args, **kw)
+        qs = qs.select_related('organization_host', 'organization_source')
+        return qs

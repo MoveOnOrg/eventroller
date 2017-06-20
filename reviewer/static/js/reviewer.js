@@ -77,23 +77,34 @@ Reviewer.prototype = {
     //get pk, dom and => this.state
     var $ = this.opt.jQuery;
     var pk = $(widget).attr('data-pk');
+    var subject = $(widget).attr('data-subject');
     if (!(this.state[pk])) {
-      this.state[pk] = {'pk': pk, 'o': widget, 'data': null};
+      this.state[pk] = {'pk': pk,
+                        'subject': subject || undefined,
+                        'o': widget,
+                        'data': null,
+                        'focus': []};
     }
   },
   updateMissingData: function(callback) {
     var newPks = [];
+    var subjects = [];
     for (var a in this.state) {
       if (!this.state[a].data) {
         newPks.push(a);
+        subjects.push(this.state[a].subject);
       }
     }
-    this.loadReviewData(newPks, callback);
+    this.loadReviewData(newPks, callback, subjects);
   },
-  loadReviewData: function(pks, callback) {
+  loadReviewData: function(pks, callback, subjects) {
     var self = this;
+    var useSubjects = (subjects || []).filter(function(x){return x}).length;
     this.$.getJSON(this.opt.apiPath + '/history/' + this.opt.organization
-                   + '/?logs=1&type=' + this.opt.contentType + '&pks=' + pks.join(','))
+                   + '/?logs=1&type=' + this.opt.contentType
+                   + '&pks=' + pks.join(',')
+                   + ((useSubjects) ? '&subjects=' + subjects.join(',') : '')
+                  )
       .then(function(data) {
         if (data.reviews && data.reviews.length == pks.length) {
           // In theory, the api delivers the reviews and logs back in the same
@@ -118,7 +129,7 @@ Reviewer.prototype = {
           }
         }
         if (callback) {
-          callback(data);
+          callback(pks, data);
         }
       });
   },
@@ -154,13 +165,15 @@ Reviewer.prototype = {
         content_type: opt.contentType,
         pk: reviewSubject.pk,
         decisions: decisions.join(';'),
-        log: log
+        log: log,
+        subject: reviewSubject.subject
       }
     }).then(function() {
       if (log) {
         if (!reviewSubject.log) { reviewSubject.log = []; }
         reviewSubject.log.unshift({"m":log,
                          "r":'<i>me</i>',
+                         "pk": reviewSubject.pk,
                          "ts":parseInt(Number(new Date())/1000)})
       }
       if (callback) { callback(); }
@@ -180,7 +193,12 @@ Reviewer.prototype = {
           var f = data.focus[i];
           // We don't test lastUpdate for focus because we cleared focus from before
           if (opt.contentType == f[0] && f[1] in self.state) {
-            newFocus[f[1]] = f[2];
+            if (f[1] in newFocus) {
+              newFocus[f[1]].push(f[2]);
+              newFocus[f[1]].sort(); //make sure the order is consistent
+            } else {
+              newFocus[f[1]] = [ f[2] ];
+            }
           }
         }
         // 2. update focus dom
@@ -190,7 +208,8 @@ Reviewer.prototype = {
           // not just update new focii, but clear old
           for (var pk in self.state) {
             if (pk in newFocus) {
-              if (newFocus[pk] != self.state[pk].focus) {
+              //dumbest, but easiest way to compare lists
+              if (newFocus[pk].toString() != self.state[pk].focus.toString()) {
                 self.state[pk].focus = newFocus[pk];
                 self.renderFocusUpdate(self.state[pk]);
               }
@@ -220,19 +239,22 @@ Reviewer.prototype = {
         // 4. update possible log additions
         if (changedPks.length) {
           self.loadReviewData(changedPks, function() {
-            (window.requestAnimationFrame||window.setTimeout)(function() {
-              for (var i=0,l=changedPks.length; i<l; i++) {
-                self.renderLogUpdate(self.state[changedPks[i]]);
+            (window.requestAnimationFrame||window.setTimeout)(function(updatedPks) {
+              for (var i=0,l=updatedPks.length; i<l; i++) {
+                self.renderLogUpdate(self.state[updatedPks[i]]);
               }
             },0);
           });
         }
       });
   },
-  initRenderAll: function() {
-    for (var a in this.state) {
-      var reviewSubject = this.state[a];
-      if (reviewSubject.o) {
+  initRenderAll: function(pks) {
+    if (!pks) {
+      pks = Object.keys(this.state);
+    }
+    for (var i=0,l=pks.length; i<l; i++) {
+      var reviewSubject = this.state[pks[i]];
+      if (reviewSubject.o && reviewSubject.data) {
         reviewSubject.o.innerHTML = this.render(reviewSubject);
         this.postRender(reviewSubject);
       }
@@ -249,18 +271,18 @@ Reviewer.prototype = {
                       return self.renderDecisions(schema, reviewSubject)
                    }).join('')
             + '    <div class="form-inline form-group">'
-            + '      <label>Log</label><input class="log form-control" type="text" />'
+            + '      <label>Note </label> <input class="log form-control" type="text" />'
             + '    </div>'
             + '  </div>'
             + '  <div class="review-header" style="padding-left:15px;">'
             + '      <button class="btn btn-default btn-primary save">Save</button>'
-            + '      <span class="focus label label-info">' + this.renderFocus(reviewSubject) + '</span>'
+            + '      <span class="focus">' + this.renderFocus(reviewSubject) + '</span>'
             + '      <span class="saved label label-success"></span>' // save status
             + '  </div>'
             + ' </div>'
             + ' <div class="panel panel-default">'
-            + '  <div class="panel-heading">Logs</div>'
-            + '  <div class="logs panel-body" aria-labelledby="Logs" style="max-height:4em;overflow-y:scroll">'
+            + '  <div class="panel-heading">Notes</div>'
+            + '  <div class="logs panel-body" aria-labelledby="Notes" style="max-height:4em;overflow-y:scroll">'
             +      this.renderLog(reviewSubject)
             + '  </div>'
             + ' </div>'
@@ -277,8 +299,13 @@ Reviewer.prototype = {
               var dateStr = d.toLocaleDateString();
               var timeStr = d.toLocaleTimeString().replace(/:\d\d /,' ').toLowerCase();
               var tsStr = ((dateStr == new Date().toLocaleDateString()) ? timeStr : dateStr);
+              var other = (reviewSubject.pk != log.pk);
+              var hue = 10*(parseInt(log.pk||0) % 36);
               return (''
-                      + '<div class="logitem">'
+                      + '<div class="logitem"'
+                      + ((other && log.pk) ? ' data-pk="'+log.pk+'" style="background-color: hsl('+hue+',17%,80%)"' : '')
+                      + '>'
+                      + ((other && log.pk) ? '<i>host:</i> ' : '')
                       + '<span class="reviewer">' + log.r + '</span>'
                       + ' (' + tsStr + '): '
                       + '<span class="logm">' + log.m + '</span>'
@@ -311,7 +338,12 @@ Reviewer.prototype = {
     });
   },
   renderFocus: function(reviewSubject) {
-    return (reviewSubject.focus || '');
+    if (!reviewSubject.focus || !reviewSubject.focus.length) {
+      return '';
+    }
+    return reviewSubject.focus.map(function(reviewer) {
+      return '<span class="label label-info">'+reviewer+'</span>'
+    }).join('');
   },
   renderFocusUpdate: function(reviewSubject) {
     this.$('.focus', reviewSubject.o).html(this.renderFocus(reviewSubject));

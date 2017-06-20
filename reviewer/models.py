@@ -97,6 +97,10 @@ class ReviewLog(models.Model):
     object_id = models.IntegerField()
     content_object = GenericForeignKey('content_type', 'object_id')
 
+    # subject is a secondary object reference,
+    # like the host id when the object is an event
+    subject = models.IntegerField(null=True, blank=True)
+
     organization = models.ForeignKey(Organization)
     reviewer = models.ForeignKey(User)
     created_at = models.DateTimeField(auto_now_add=True)

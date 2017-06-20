@@ -1,9 +1,9 @@
 from __future__ import unicode_literals
 import hashlib
+import re
 
 from django.db import models
 from django.contrib.auth.models import User, Group
-from django.contrib.postgres.fields import JSONField
 
 class Organization(models.Model):
     title = models.CharField(max_length=765)
@@ -66,7 +66,7 @@ class Activist(models.Model):
         return False
 
 
-EVENT_REVIEW_CHOICES = (('', 'New'),
+EVENT_REVIEW_CHOICES = ((None, 'New'),
                         ('reviewed', 'Reviewed'),
                         ('vetted', 'Vetted'),
                         ('questionable', 'Questionable'),
@@ -133,22 +133,24 @@ class Event(models.Model):
     public_description = models.TextField(blank=True)
     directions = models.TextField(blank=True)
     note_to_attendees = models.TextField(blank=True)
-    notes = models.TextField(blank=True)
+    internal_notes = models.TextField(blank=True)
 
     #from ground-control
     #eventIdObfuscated: {type: GraphQLString},
     organization_official_event = models.NullBooleanField(null=True)
     event_type = models.CharField(max_length=765, null=True, blank=True)
-    organization_host = models.ForeignKey('Activist', blank=True, null=True)
+    organization_host = models.ForeignKey('Activist', blank=True, null=True, on_delete=models.SET_NULL)
     organization = models.ForeignKey('Organization', blank=True, null=True, db_index=True)
-    organization_source = models.ForeignKey('event_exim.EventSource', blank=True, null=True, db_index=True)
+    organization_source = models.ForeignKey('event_exim.EventSource', blank=True, null=True,
+                                            on_delete=models.SET_NULL,
+                                            db_index=True)
     organization_campaign = models.CharField(max_length=765, db_index=True)
     organization_source_pk = models.CharField(max_length=765, blank=True, null=True, db_index=True)
 
     #this can be any other data the event source wants/needs to store
     # in this field to resolve additional information.  It can be the original data,
     # but could also be more extended info like social sharing data
-    source_json_data = JSONField(null=True, blank=True)
+    source_json_data = models.TextField(null=True, blank=True)
 
     #hostId: {type: GraphQLString}, = add primary_host
     #localTimezone: {type: GraphQLString}, #not there, but starts_at + starts_at_utc sorta does that
@@ -197,9 +199,11 @@ class Event(models.Model):
     organization_status_prep = models.CharField(max_length=32, blank=True, null=True, db_index=True,
                                                 choices=EVENT_PREP_CHOICES)
 
-    #later
-    def host_edit_url(self):
-        pass #organization can implement
+
+    def host_edit_url(self, edit_access=False):
+        src = self.organization_source
+        if src and hasattr(src.api, 'get_host_event_link'):
+            return src.api.get_host_event_link(self, edit_access=edit_access)
 
     def handle_rsvp(self):
         return None #organization can implement
@@ -209,6 +213,17 @@ class Event(models.Model):
             'review_status': self.organization_status_review,
             'prep_status': self.organization_status_prep,
         }
+
+    def political_scope_display(self):
+        if self.political_scope:
+            m = re.match(
+                r'ocd-division/country:(?P<country>\w+)/\w+:(?P<region>\w+)/(?P<district_type>\w+):(?P<district>\w+)',
+                self.political_scope)
+            if m:
+                return '{}_{}'.format(m.group('region').upper(), m.group('district').upper())
+            else:
+                return self.political_scope
+        return ''
 
     def on_save_review(self, reviews, log_message=None):
         """
