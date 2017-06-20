@@ -6,6 +6,7 @@ from django.conf import settings
 from django.contrib.auth.models import User, Group
 from django.db import models
 from django.utils.functional import cached_property
+from django.db.models import Count
 # from django.db.models.signals import post_save
 # from django.dispatch import receiver
 
@@ -132,13 +133,11 @@ class EventSource(models.Model):
             event.save()
         return changed
 
-
 class EventDupeManager(models.Manager):
     def create_event_dupe(self, source_event, dupe_event):
         event_dupe = self.create(source_event = source_event, dupe_event = dupe_event, decision = 0)
         event_dupe.save()
         return event_dupe.id
-
 
 class EventDupeGuesses(models.Model):
     source_event = models.ForeignKey(Event, related_name='dupe_guesses')
@@ -152,7 +151,6 @@ class EventDupeGuesses(models.Model):
                                              blank = True
                                             )
 
-    objects = EventDupeManager()
     class Meta:
         unique_together = (('source_event','dupe_event'),)
   
@@ -186,21 +184,72 @@ class EventDupeGuesses(models.Model):
         return dupe_event
     dupe_event_summary.short_description = 'Duplicate Event'
 
-# Currently doesn't handle the case where an event has more than one duplicate. 
-# Implementing this should wait until we have a clear use case for dupe_id on events
-# @receiver(post_save, sender = EventDupeGuesses, dispatch_uid = 'update_event_dupe')
-# def update_event_dupe_id(sender, instance, **kwargs):
-#     print("now in post save!")
-#     # yes, a duplicate
-#     if instance.decision == 2:
-#         instance.dupe_event.dupe_id = instance.source_event_id
-#         instance.dupe_event.save()
-#         print("recording dupe id %s on event %s" %(instance.source_event_id, instance.dupe_event.id))
-#     # undecided or not a duplicate
-#     elif instance.decision == 1 or instance.decision == 0 or instance.decision == None:
-#         instance.dupe_event.dupe_id = None
-#         instance.dupe_event.save()
-#         print("event %s dupe_id set to None" % instance.dupe_event.id)
+    @staticmethod
+    def get_potential_dupes():
+        """
+            Things that will muddle screening for duplicates:
+            * Bad data, e.g. zip code typos, errors converting local time to starts_at_utc.
+            * Missing data, e.g. virtual events with no zip code/location data
+        """
+        return (
+            Event.objects.values('zip','starts_at_utc')
+            .annotate(count = Count('id'))
+            .order_by()
+            .filter(
+                count__gt = 1,
+                dupe_id__isnull = True,
+                zip__isnull = False,
+                starts_at_utc__isnull = False,
+                status = 'active'
+            )
+            .exclude(zip='')
+        )
+
+    @staticmethod    
+    def record_potential_dupes(potential_dupes):
+        message = 'Recording new potential duplicate events: \n'
+        for dupe in potential_dupes:
+            events = (
+                Event.objects
+                .filter(zip = dupe['zip'], starts_at_utc = dupe['starts_at_utc'])
+                .order_by('id')
+            )
+            for x in range(dupe['count']):
+                for y in range(x+1,dupe['count']):
+                    source_event = events[x]
+                    dupe_event = events[y]
+                    answer = EventDupeGuesses.objects.get_or_create(
+                        source_event = source_event, 
+                        dupe_event = dupe_event, 
+                        decision = 0
+                    )
+                    if not answer[1]:
+                        message += (
+                            "Duplicate event guess for {} and {} already recorded \n"
+                            .format(source_event.id, dupe_event.id)
+                        )
+                    else:       
+                        message += (
+                            "Recorded duplicate guess: Events {} and {} \n"
+                            .format(source_event.id, dupe_event.id)
+                        )
+        return message
+
+    # Currently doesn't handle the case where an event has more than one duplicate. 
+    # Implementing this should wait until we have a clear use case for dupe_id on events
+    # @receiver(post_save, sender = EventDupeGuesses, dispatch_uid = 'update_event_dupe')
+    # def update_event_dupe_id(sender, instance, **kwargs):
+    #     print("now in post save!")
+    #     # yes, a duplicate
+    #     if instance.decision == 2:
+    #         instance.dupe_event.dupe_id = instance.source_event_id
+    #         instance.dupe_event.save()
+    #         print("recording dupe id %s on event %s" %(instance.source_event_id, instance.dupe_event.id))
+    #     # undecided or not a duplicate
+    #     elif instance.decision == 1 or instance.decision == 0 or instance.decision == None:
+    #         instance.dupe_event.dupe_id = None
+    #         instance.dupe_event.save()
+    #         print("event %s dupe_id set to None" % instance.dupe_event.id)
 
 
 class Org2OrgShare(models.Model):
