@@ -1,0 +1,25 @@
+<a id="send-host-login-link--{{event_id}}" href="{{link|safe}}" class="btn btn-default">Send login link to hosts</a>
+<span id="send-host-login-link-status--{{event_id}}" class="hidden"></span>
+<script>
+$('#send-host-login-link--{{event_id}}').click(function() {
+    var $link = $('#send-host-login-link--{{event_id}}');
+    var $status = $('#send-host-login-link-status--{{event_id}}');
+    $status
+        .text('Sending ...')
+        .attr('class', 'alert alert-warning');
+    $.getJSON($link.attr('href'), function(data) {
+        console.log(data);
+        console.log(data.result);
+        if (data.result == 'success') {
+            $status
+                .text('Sent')
+                .attr('class', 'alert alert-success');
+        } else {
+            $status
+                .text('Error')
+                .attr('class', 'alert alert-danger');
+        }
+    });
+    return false;
+});
+</script>

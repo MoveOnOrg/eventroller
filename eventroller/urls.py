@@ -11,6 +11,7 @@ urlpatterns = [
     url(r'^review/', include('reviewer.urls')),
     url(r'^api/v1/', include('event_exim.urls')),
     url('^', include('django.contrib.auth.urls')),
+    url('^', include('event_review.urls')),
 ]
 
 if settings.DEBUG:

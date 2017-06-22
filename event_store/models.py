@@ -205,6 +205,12 @@ class Event(models.Model):
         if src and hasattr(src.api, 'get_host_event_link'):
             return src.api.get_host_event_link(self, edit_access=edit_access)
 
+    def extra_management_html(self):
+        src = self.organization_source
+        if src and hasattr(src.api, 'get_extra_event_management_html'):
+            return src.api.get_extra_event_management_html(self)
+        return ''
+
     def handle_rsvp(self):
         return None #organization can implement
 

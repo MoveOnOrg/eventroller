@@ -56,12 +56,14 @@ def event_list_display(obj, onecol=False):
           <div class="col-md-6">
             <div><b>Private Phone:</b> {private_phone}</div>
             <div><b>Event Status:</b> {active_status}</div>
+            {extra_html}
             {review_widget}
           </div>
         """,
         private_phone=phone_format(obj.private_phone),
         active_status=obj.status,
-        review_widget=review_widget(obj, obj.organization_host_id)
+        review_widget=review_widget(obj, obj.organization_host_id),
+        extra_html=obj.extra_management_html()
         )
     return format_html("""
         <div class="row">
@@ -96,10 +98,6 @@ def event_list_display(obj, onecol=False):
                 if obj.is_private else '',
         host=host_format(obj),
         second_col=second_col,
-        #review_status=obj.organization_status_review,
-        #prep_status=obj.organization_status_prep,
-        #notes=mark_safe('<textarea rows="5" class="form-control" readonly>%s</textarea>' % obj.notes)
-        #    if obj.notes else None,
         description = mark_safe('<textarea rows="5" class="form-control" readonly>%s</textarea>' % obj.public_description)
             if obj.public_description else None)
 
