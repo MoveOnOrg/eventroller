@@ -280,11 +280,9 @@ Reviewer.prototype = {
             + '      <span class="saved label label-success"></span>' // save status
             + '  </div>'
             + ' </div>'
-            + ' <div class="panel panel-default">'
-            + '  <div class="panel-heading">Notes</div>'
-            + '  <div class="logs panel-body" aria-labelledby="Notes" style="max-height:4em;overflow-y:scroll">'
+            + ' <b>Notes:</b>'
+            + ' <div class="logs well well-sm" aria-labelledby="Notes" style="max-height:7em;overflow-y:scroll">'
             +      this.renderLog(reviewSubject)
-            + '  </div>'
             + ' </div>'
             + '</div>'
            )

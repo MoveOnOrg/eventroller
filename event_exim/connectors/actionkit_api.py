@@ -59,7 +59,7 @@ class Connector:
                      'updated_at']
 
     other_fields = ['ee.id', 'ee.creator_id', 'ee.campaign_id', 'ee.phone', 'ee.notes',
-                    'ec.title', 'signuppage.name', 'createpage.name',
+                    'ec.title', 'signuppage.name', 'createpage.name', 'createaction.action_id',
                     'u.id', 'u.first_name', 'u.last_name', 'u.email', 'loc.us_district', 'recentphone.value']
 
     event_fields = ['review_status', 'prep_status',
@@ -85,6 +85,7 @@ class Connector:
         " LEFT JOIN core_location loc ON (loc.user_id = u.id)"
         " JOIN core_eventsignuppage ces ON (ces.campaign_id = ee.campaign_id)"
         " JOIN core_page signuppage ON (signuppage.id = ces.page_ptr_id AND signuppage.hidden=0 AND signuppage.status='active')"
+        " JOIN core_eventcreateaction createaction ON (createaction.event_id = ee.id)"
         " LEFT JOIN core_eventcreatepage cec ON (cec.campaign_id = ee.campaign_id)"
         " LEFT JOIN core_page createpage ON (createpage.id = cec.page_ptr_id AND createpage.hidden=0 AND createpage.status='active')"
         " %(eventjoins)s "
@@ -232,6 +233,7 @@ class Connector:
                                  # other random data to keep around
                                  'campaign_id': event_row[fi['ee.campaign_id']],
                                  'create_page': event_row[fi['createpage.name']],
+                                 'create_action_id': event_row[fi['createaction.action_id']],
                              }),
                          })
         for df in self.date_fields:

@@ -25,6 +25,15 @@ class SortingFilter(CollapsedSimpleListFilter):
         return queryset.order_by(val) if val else queryset
 
 
+def filter_with_emptyvalue(empty_value):
+    class Filter(CollapsedListFilter):
+
+        def __init__(self, *args, **kw):
+            CollapsedListFilter.__init__(self, *args, **kw)
+            self.empty_value_display = empty_value
+    return Filter
+
+
 class ReviewFilter(CollapsedListFilter):
 
     def __init__(self, *args, **kw):
