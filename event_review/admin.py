@@ -65,6 +65,7 @@ def event_list_display(obj, onecol=False):
           <div class="col-md-6">
             <div><b>Private Phone:</b> {private_phone}</div>
             <div><b>Event Status:</b> {active_status}</div>
+            {extra_html}
             {review_widget}
             {internal_notes}
           </div>
@@ -72,7 +73,8 @@ def event_list_display(obj, onecol=False):
         private_phone=phone_format(obj.private_phone),
         active_status=obj.status,
         review_widget=review_widget(obj, obj.organization_host_id),
-        internal_notes=(long_field(obj.internal_notes,'<b>Past Notes</b>') if obj.internal_notes else '')
+        internal_notes=(long_field(obj.internal_notes,'<b>Past Notes</b>') if obj.internal_notes else ''),
+        extra_html=obj.extra_management_html()
         )
     return format_html("""
         <div class="row">
@@ -108,12 +110,9 @@ def event_list_display(obj, onecol=False):
                 if obj.is_private else '',
         host=host_format(obj),
         second_col=second_col,
-        #notes=mark_safe('<textarea rows="5" class="form-control" readonly>%s</textarea>' % obj.internal_notes)
-        #    if obj.notes else None,
         description=long_field(obj.public_description),
         directions=long_field(obj.directions),
         note_to_attendees=long_field(obj.note_to_attendees))
-
 
 @admin.register(Event)
 class EventAdmin(admin.ModelAdmin):

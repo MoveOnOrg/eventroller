@@ -3,6 +3,8 @@ from itertools import chain
 import json
 import re
 
+from django.template.loader import render_to_string
+
 from actionkit.api.event import AKEventAPI
 from actionkit.api.user import AKUserAPI
 from actionkit.utils import generate_akid
@@ -324,7 +326,7 @@ class Connector:
                 return '{}/admin/events/event/?campaign={cid}&event_id={eid}'.format(
                     self.base_url, cid=cid, eid=event.organization_source_pk)
 
-    def get_host_event_link(self, event, edit_access=False):
+    def get_host_event_link(self, event, edit_access=False, host_id=False):
         if event.status != 'active':
             return None
         jsondata = event.source_json_data
@@ -337,12 +339,22 @@ class Connector:
         host_link = '/event/{create_page}/{event_id}/host/'.format(
             create_page=create_page,
             event_id=event.organization_source_pk)
-        if edit_access and self.cohost_id and self.akapi.secret:
+
+        if not host_id:
+            host_id = self.cohost_id
+
+        if edit_access and host_id and self.akapi.secret:
             #easy memoization for a single user
-            token = _LOGIN_TOKENS.get(self.cohost_id, False)
+            token = _LOGIN_TOKENS.get(host_id, False)
             if token is False:
-                token = self.akapi.login_token(self.cohost_id)
-                _LOGIN_TOKENS[self.cohost_id] = token
+                token = self.akapi.login_token(host_id)
+                _LOGIN_TOKENS[host_id] = token
             if token:
                 host_link = '/login/?i={}&l=1&next={}'.format(token, host_link)
         return '{}{}'.format(self.base_url, host_link)
+
+    def get_extra_event_management_html(self, event):
+        return render_to_string(
+            'event_exim/actionkit-extra_event_management.html',
+            {'event_id':event.id,
+             'link':'/api/actionkit/hostloginreminder/%s/' % event.id})
