@@ -2,7 +2,7 @@ from django.conf.urls import include, url
 from . import views
 
 urlpatterns = [
-    url(r'^api/actionkit/hostloginreminder/(?P<event_id>[-.\w]+)/$',
-        views.send_actionkit_host_login_reminder,
-        name='event_review_actionkit_hostloginreminder'),
+    url(r'^api/messagehost/(?P<event_id>[-.\w]+)/(?P<host_id>[-.\w]+)?/?$',
+        views.send_host_message,
+        name='event_review_host_message'),
 ]

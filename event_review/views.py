@@ -9,10 +9,10 @@ from actionkit.api.user import AKUserAPI
 from event_store.models import Event
 from event_exim.connectors.actionkit_api import Connector
 
-def send_actionkit_host_login_reminder(request, event_id):
+def send_host_message(request, event_id, host_id=None):
     result = 'failed to send'
 
-    if settings.FROM_EMAIL:
+    if getattr(settings, 'FROM_EMAIL', None):
         event = Event.objects.filter(id=event_id).first()
         if event:
             src = event.organization_source

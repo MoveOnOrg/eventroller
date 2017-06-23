@@ -28,25 +28,38 @@ def phone_format(phone):
 
 def host_format(event):
     host = event.organization_host
-    host_items = [str(host)]
+    host_line = [format_html('{}', host)]
+    host_items = []
+    if event.host_is_confirmed:
+        host_line.append(mark_safe(' (<span style="color:green">confirmed</span>) '))
+    else:
+        host_line.append(mark_safe(' (<span style="color:red">unconfirmed</span>) '))
+
+    host_line.append(mark_safe('<br />'))
+
     if getattr(host, 'email', None):
         host_items.append(format_html('<a data-system-pk="{}" href="mailto:{}">email</a>',
                                       host.member_system_pk or '',
                                       host.email,
                                       host))
 
-    if event.host_is_confirmed:
-        host_items.append(mark_safe(' (<span style="color:green">confirmed</span>) '))
-    else:
-        host_items.append(mark_safe(' (<span style="color:red">unconfirmed</span>) '))
 
     host_link = event.host_edit_url(edit_access=True)
     if host_link:
         host_items.append(format_html('<a href="{}">Act as host</a>', host_link))
+
+    # from the connector
+    extra_html=event.extra_management_html()
+    if extra_html:
+        host_items.append(extra_html)
+
+    # give settings a chance to tweak/alter/add items
     customize_host_link = getattr(settings, 'EVENT_REVIEW_CUSTOM_HOST_DISPLAY', None)
     if callable(customize_host_link):
         host_items = customize_host_link(event, host_items)
-    return mark_safe(' '.join(host_items))
+    host_items.insert(0, ' '.join(host_line))
+    print(host_items)
+    return mark_safe(' <span class="glyphicon glyphicon-star-empty"></span>'.join(host_items))
 
 def long_field(longtext, heading=''):
     if not longtext:
@@ -65,7 +78,6 @@ def event_list_display(obj, onecol=False):
           <div class="col-md-6">
             <div><b>Private Phone:</b> {private_phone}</div>
             <div><b>Event Status:</b> {active_status}</div>
-            {extra_html}
             {review_widget}
             {internal_notes}
           </div>
@@ -73,8 +85,7 @@ def event_list_display(obj, onecol=False):
         private_phone=phone_format(obj.private_phone),
         active_status=obj.status,
         review_widget=review_widget(obj, obj.organization_host_id),
-        internal_notes=(long_field(obj.internal_notes,'<b>Past Notes</b>') if obj.internal_notes else ''),
-        extra_html=obj.extra_management_html()
+        internal_notes=(long_field(obj.internal_notes,'<b>Past Notes</b>') if obj.internal_notes else '')
         )
     return format_html("""
         <div class="row">
