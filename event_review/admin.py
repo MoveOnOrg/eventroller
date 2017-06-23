@@ -15,7 +15,7 @@ from event_review.filters import (filter_with_emptyvalue,
                                   EventMaxDateFilter,
                                   EventMinDateFilter,
                                   IsPrivateFilter,
-                                  HostConfirmationFilter,
+                                  HostStatusFilter,
                                   PoliticalScopeFilter,
                                   SortingFilter)
 
@@ -58,7 +58,6 @@ def host_format(event):
     if callable(customize_host_link):
         host_items = customize_host_link(event, host_items)
     host_items.insert(0, ' '.join(host_line))
-    print(host_items)
     return mark_safe(' <span class="glyphicon glyphicon-star-empty"></span>'.join(host_items))
 
 def long_field(longtext, heading=''):
@@ -142,7 +141,7 @@ class EventAdmin(admin.ModelAdmin):
                    IsPrivateFilter,
                    EventMinDateFilter,EventMaxDateFilter,
                    ('status', CollapsedListFilter),
-                   HostConfirmationFilter,
+                   HostStatusFilter,
                    EventAttendeeMaxFilter,
                    EventAttendeeCountFilter,
                    EventFullness,
@@ -156,7 +155,10 @@ class EventAdmin(admin.ModelAdmin):
                    textinputfilter_factory('City',
                                            'city'),
                    textinputfilter_factory('Zip',
-                                           'zip'),)
+                                           'zip'),
+                   textinputfilter_factory('Event Id',
+                                           'organization_source_pk'),
+               )
 
     list_display_links = None
 

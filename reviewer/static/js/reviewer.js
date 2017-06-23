@@ -291,25 +291,44 @@ Reviewer.prototype = {
     this.$('.saved', reviewSubject.o).html('saved!').show().fadeOut(2000);
   },
   renderLog: function(reviewSubject) {
-    return ((!reviewSubject.log) ? ''
-            : reviewSubject.log.map(function(log) {
-              var d = new Date(log.ts * 1000);
-              var dateStr = d.toLocaleDateString();
-              var timeStr = d.toLocaleTimeString().replace(/:\d\d /,' ').toLowerCase();
-              var tsStr = ((dateStr == new Date().toLocaleDateString()) ? timeStr : dateStr);
-              var other = (reviewSubject.pk != log.pk);
-              var hue = 10*(parseInt(log.pk||0) % 36);
-              return (''
-                      + '<div class="logitem"'
-                      + ((other && log.pk) ? ' data-pk="'+log.pk+'" style="background-color: hsl('+hue+',17%,80%)"' : '')
-                      + '>'
-                      + ((other && log.pk) ? '<i>host:</i> ' : '')
-                      + '<span class="reviewer">' + log.r + '</span>'
-                      + ' (' + tsStr + '): '
-                      + '<span class="logm">' + log.m + '</span>'
-                      + '</div>'
-                     );
-              }).join(''));
+    if (!reviewSubject.log || !reviewSubject.log.length) {
+      return '';
+    }
+    var isHostLog = function(log) {
+      return (reviewSubject.pk != log.pk);
+    }
+    var renderLogHtml = function(log) {
+      var d = new Date(log.ts * 1000);
+      var dateStr = d.toLocaleDateString();
+      var timeStr = d.toLocaleTimeString().replace(/:\d\d /,' ').toLowerCase();
+      var tsStr = ((dateStr == new Date().toLocaleDateString()) ? timeStr : dateStr);
+      var other = isHostLog(log);
+      var hue = 10*(parseInt(log.pk||0) % 36);
+      return (''
+              + '<div class="logitem"'
+              + ((other && log.pk) ? ' data-pk="'+log.pk+'" style="background-color: hsl('+hue+',17%,80%)"' : '')
+              + '>'
+              + ((other && log.pk) ? '-- ' : '')
+              + '<span class="reviewer">' + log.r + '</span>'
+              + ' (' + tsStr + '): '
+              + '<span class="logm">' + log.m + '</span>'
+              + '</div>'
+             );
+    };
+    var eventNotes = '';
+    var hostNotes = '';
+    reviewSubject.log.map(function(log) {
+      if (isHostLog(log)) {
+        hostNotes = hostNotes + renderLogHtml(log);
+      } else {
+        eventNotes = eventNotes + renderLogHtml(log);
+      }
+    });
+    if (hostNotes) {
+      eventNotes = eventNotes + '<div><b>Host Notes (from past events)</b></div>' + hostNotes;
+    }
+    return eventNotes
+
   },
   renderLogUpdate: function(reviewSubject) {
     this.$('.logs', reviewSubject.o).html(this.renderLog(reviewSubject));

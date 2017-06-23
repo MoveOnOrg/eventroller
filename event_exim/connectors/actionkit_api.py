@@ -361,7 +361,7 @@ class Connector:
         return '{}{}'.format(self.base_url, host_link)
 
     def get_extra_event_management_html(self, event):
-        if not getattr(settings, 'FROM_EMAIL', None):
+        if not getattr(settings, 'FROM_EMAIL', None) or not event.organization_host_id:
             return None
         try:
             api_link = reverse('event_review_host_message', args=[event.id, ''])
