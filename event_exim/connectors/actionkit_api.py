@@ -10,7 +10,7 @@ from django.urls import reverse, NoReverseMatch
 from actionkit.api.event import AKEventAPI
 from actionkit.api.user import AKUserAPI
 from actionkit.utils import generate_akid
-from event_store.models import Activist, Event, CHOICES
+from event_store.models import Activist, CHOICES
 
 """
 Non-standard use in ActionKit:

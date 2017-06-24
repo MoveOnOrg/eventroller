@@ -169,7 +169,7 @@ class EventSource(models.Model):
                         continue
                     else:
                         results[source_name] = ['Creating EventSource %s.' % source_name]
-                        db_source = EventSource()
+                        db_source = EventSource(name=source_name)
                         for field, val in eventsource_spec.items():
                             if hasattr(db_source, field):
                                 setattr(db_source, field, val)

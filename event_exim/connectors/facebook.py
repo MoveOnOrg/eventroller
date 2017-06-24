@@ -5,10 +5,14 @@ import re
 import time
 
 import requests
+from event_store.models import Activist, CHOICES
 
 #facebook wants php strtotime() format
 # https://secure.php.net/manual/en/function.strtotime.php
 DATE_FMT = '%Y-%m-%dT%H:%M:%S%z'
+
+def strip_tz(datetime):
+    return datetime.replace(tzinfo=None)
 
 class Connector:
     """
@@ -59,8 +63,10 @@ should change.
                     ('place.location(city,'
                      'country_code,latitude,longitude,'
                      'name,region,state,street,zip)'),
-                    'timezone',
+                    'timezone', # e.g. "America/New_York"
                     'updated_time', #format: 2017-05-04T14:48:21+0000
+                    'ticketing_privacy_uri',
+                    'ticketing_terms_uri',
                 ]
 
     PAGE_FIELDS = ['id',
@@ -85,10 +91,16 @@ should change.
                                'required': True},
                 'token_expires': {'help_text': 'date in "2017-08-08" format for when the authtoken expires',
                                   'required': False},
-                'page_id': {'help_text': ('page id (your facebook url after the first'
-                                          ' /, e.g. https://www.facebook.com/moveon/'
-                                          ' => "moveon" for page_id)'),
-                            required: True},
+                #either page_ids or event_ids is required to load_events automatically
+                'page_ids': {'help_text': ('page id (your facebook url after the first'
+                                           ' /, e.g. https://www.facebook.com/moveon/'
+                                           ' => "moveon" for page_id)'
+                                           ' For multiple, separate by commas.'),
+                             required: False},
+                'event_ids': {'help_text': ('event ids are the url after'
+                                            '"facebook.com/event/"'
+                                            ' This should be a comma separated list for multiple.'),
+                             required: False},
         }
 
     def __init__(self, event_source):
@@ -98,87 +110,152 @@ should change.
         self.base_url = 'https://graph.facebook.com/'
         self.api_version = 'v2.9/'
         self.auth_token = data.get('auth_token')
-        self.page_id = data['page_id']
+        self.page_ids = data.get('page_ids')
+        self.event_ids = data.get('event_ids')
 
     def _convert_host(self, facebook_event):
-        return None #TODO
+        owner = facebook_event.get('owner', {})
+        if owner:
+            return Activist(member_system=self.source,
+                            member_system_pk=owner.get('id'),
+                            name=owner.get('name'))
+        else:
+            return None
 
     def _convert_event(self, facebook_event):
         start_time = datetime.datetime.strptime(facebook_event['start_time'], DATE_FMT)
         end_time = (datetime.datetime.strptime(facebook_event['end_time'], DATE_FMT)
                     if facebook_event.get('end_time') else None)
+        # TODO: sometimes place.name will have a full address on one line without it broken down into location
+        location = facebook_event.get('place',{}).get('location', {})
+        is_private = 1 if (facebook_event.get('is_draft')  or facebook_event['type'] != 'public') else 0
+        url = 'https://www.facebook.com/events/{}'.format(facebook_event['id'])
         TODO = None
         event_fields = {
-            'address1': TODO,
-            'address2': TODO,
-            'city': TODO,
-            'state': TODO,
-            'region': TODO,
-            'postal': TODO,
-            'zip': TODO,
-            'plus4': TODO,
-            'country': TODO,
-            'longitude': TODO,
-            'latitude': TODO,
+            'address1': location.get('street'),
+            'address2': None,
+            'city': location.get('city'),
+            'state': location.get('state'),
+            'region': location.get('region', location.get('state')),
+            'postal': location.get('zip'), #TODO: need international example
+            'zip': location.get('zip'),
+            'plus4': None,
+            'country': location.get('country'), #"United States"
+            'longitude': location.get('longitude'),
+            'latitude': location.get('latitude'),
             'title': facebook_event['name'],
-            'starts_at': start_time,
-            'ends_at': end_time,
-            'starts_at_utc': datetime.datetime.fromtimestamp(time.mktime(start_time.utctimetuple())),
-            'ends_at_utc': (datetime.datetime.fromtimestamp(time.mktime(end_time.utctimetuple()))
+            'starts_at_utc': strip_tz(datetime.datetime.fromtimestamp(
+                                time.mktime(start_time.utctimetuple()))),
+            'ends_at_utc': (strip_tz(datetime.datetime.fromtimestamp(
+                                time.mktime(end_time.utctimetuple())))
                             if end_time else None),
-            'status': TODO,
+            'starts_at': strip_tz(start_time),
+            'ends_at': strip_tz(end_time),
+            # yes, facebook spells is 'canceled' (and eventstore/actionkit spell it 'cancelled'
+            'status': 'cancelled' if facebook_event.get('is_canceled') else 'active',
             'host_is_confirmed': 1, # facebook claims to makes sure accounts are people
-            'is_private': facebook_event['is_draft'],
+            'is_private': is_private,
             'is_approved': 1,
-            'attendee_count': TODO,
-            'max_attendees': TODO,
-            'venue': TODO,
+            'attendee_count': facebook_event.get('attending_count'),
+            'max_attendees': None,
+            'venue': facebook_event.get('place',{}).get('name'),
             'public_description': facebook_event['description'],
-            'directions': TODO,
-            'note_to_attendees': TODO,
-            'updated_at': TODO,
-            'organization_official_event': TODO, #maybe if same org as page or is_owner
-            'event_type': TODO, #'unknown',
+            'directions': '',
+            'note_to_attendees': '',
+            'updated_at': datetime.datetime.strptime(facebook_event['updated_time'], DATE_FMT),
+            'organization_official_event': TODO, # maybe if same org as page or is_owner
+            'event_type': facebook_event.get('category'), # "EVENT_CAUSE", "CAUSES", "OTHER"
             'organization_host': self._convert_host(facebook_event), #TODO
             'organization_source': self.source,
             'organization_source_pk': facebook_event['id'],
             'organization': self.source.origin_organization,
-            'organization_campaign': TODO,
-            'is_searchable': TODO
+            'organization_campaign': '', # maybe owner?
+            'is_searchable': is_private,
             'private_phone': '',
             'phone': '',
-            'url': TODO,
-            'slug': TODO,
-            'osdi_origin_system': TODO,
-            'ticket_type': TODO,
-            'share_url': TODO,
+            'url': url,
+            'slug': 'facebook-{}'.format(facebook_event['id']),
+            'osdi_origin_system': 'facebook.com',
+            # unknown unless we have a ticket uri
+            'ticket_type': (CHOICES['ticketed']
+                            if facebook_event.get('ticket_uri')
+                            else CHOICES['unknown']),
+            'share_url': url,
             'internal_notes': '',
             #e.g. NC cong district 2 = "ocd-division/country:us/state:nc/cd:2"
-            'political_scope': TODO,
-            'venue_category': TODO,
-            'needs_organizer_help': TODO,
-            'rsvp_url': TODO,
-            'event_facebook_url': TODO,
+            'political_scope': None, #TODO: zip2district support
+            'venue_category': CHOICES['unknown'],
+            'needs_organizer_help': 0,
+            'rsvp_url': facebook_event.get('ticket_uri', url),
+            'event_facebook_url': url,
             'organization_status_review': None,
             'organization_status_prep': None,
-            'source_json_data': None,
+            'source_json_data': json.dumps({
+                k:facebook_event.get(k)
+                for k in ('maybe_count',
+                          'interested_count',
+                          'declined_count',
+                          'parent_group',
+                          'timezone',
+                          'ticketing_privacy_uri',
+                          'ticketing_terms_uri',
+                          'is_viewer_admin',
+                          'can_viewer_post',
+                          'owner')
+            }),
         }
         return event_fields
 
 
-    def get_owner(self, owner_id):
+    def _api_load(self, ids, ids_are_events=True,
+                  since_str='', follow_next=0):
         """
-        {'id': '14226615647', 'link': 'https://www.facebook.com/peoplefor/', 'name': 'People For the American Way', 'location': {'zip': '20005', 'country': 'United States', 'state': 'DC', 'latitude': 38.90411, 'city': 'Washington', 'longitude': -77.0342, 'street': '1101 15th St NW Ste 600'}, 'category': 'Nonprofit Organization'}
-        owner_json = requests.get(
-            '{}{}{}'.format(self.base_url, self.api_version),
+        Loads events from facebook api.
+        if `ids` are comma-separated events, then ids_are_events=True
+        if `ids` are comma-separated pages, then ids_are_events=False
         """
-        pass
+        ids = re.sub(r'[^\w,-]', '', ids) # securiteh!
+        params = {"ids": ids,
+                  "access_token": self.auth_token}
+        fieldlist = ','.join(self.EVENT_FIELDS)
 
-    def get_event(self, event_id):
+        if ids_are_events:
+            params['fields'] = fieldlist
+        else: #they must be pages
+            params['fields'] = "events.fields({0}){1}".format(
+                fieldlist, since_str)
+
+        res = requests.get(
+            '{}{}'.format(self.base_url, self.api_version),
+            params=params)
+        events = res.json()
+        # pages return arrays (under events.data)
+        # events return the event object directly
+        # so we homogenize the output to a single list
+        # TODO (oh, but maybe the PAGE should be the campaign?)
+        #  is the page also the owner?
+        if ids_are_events:
+            return events.values()
+        else:
+            fb_events = []
+            for page_id, result in events.items():
+                fb_events.extend(result.get('events',{}).get('data',[]))
+                next_link = result.get('events',{}).get('paging',{}).get('next')
+                if next_link and follow_next:
+                    ## TODO: iterate on url
+                    pass
+            return fb_events
+
+    def get_event(self, event_id_or_url):
         """
         Returns an a dict with all event_store.Event model fields
         """
-        pass
+        is_url = re.match(r'https://www.facebook.com/events/(\d+)', event_id_or_url)
+        if is_url:
+            event_id_or_url = is_url.group(1)
+        events = self._api_load(event_id_or_url, ids_are_events=True)
+        if events:
+            return self._convert_event(events[0])
 
     def load_events(self, max_events=None, last_updated=None):
         all_events = []
@@ -187,21 +264,13 @@ should change.
         if last_updated:
             since_str = '.since({1})'.format(last_updated)
 
-        page_sanitized = re.sub(r'\W', '', self.page_id) # securiteh!
-        #TODO: loop through next links
-        events = requests.get(
-            '{}{}'.format(self.base_url, self.api_version),
-            params={
-                "ids": page_sanitized,
-                "fields": "events.fields({0}){1}".format(
-                    ','.join(self.EVENT_FIELDS), since_str),
-                "access_token": self.auth_token,
-            }).json()
-        result = events.get(page_sanitized)
-        if result:
-            event_data = result['events']['data']
-        else:
-            print('failed result')
-        import pdb; pdb.set_trace()
+        if self.event_ids:
+            events = self._api_load(self.event_ids, ids_are_events=True)
+            all_events.extend([self._convert_event(e) for e in events])
+        if self.page_ids:
+            events = self._api_load(self.page_ids, ids_are_events=False,
+                                    since_str=since_str)
+            all_events.extend([self._convert_event(e) for e in events])
+
         return {'events': all_events,
                 'last_updated': datetime.datetime.utcnow().strftime(DATE_FMT)}
