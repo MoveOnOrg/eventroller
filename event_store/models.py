@@ -246,11 +246,7 @@ class Event(models.Model):
         if src and src.allows_updates:
             connector = src.api
             if connector and hasattr(connector, 'update_review'):
-                try:
-                    connector.update_review(self, reviews, log_message)
-                except:
-                    # TODO: log this?
-                    pass # we still want to save locally, no matter what the api does
+                connector.update_review(self, reviews, log_message)
         reviewkeys = {
             'prep_status': 'organization_status_prep',
             'review_status': 'organization_status_review'

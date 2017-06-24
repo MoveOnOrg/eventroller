@@ -310,7 +310,7 @@ class Connector:
         return {'events': [self._convert_event(event_rows) for event_rows in all_events.values()],
                 'last_updated': datetime.datetime.utcnow().strftime(DATE_FMT)}
 
-    def update_review(self, event, reviews):
+    def update_review(self, event, reviews, log_message):
         res = self.akapi.get_event(event.organization_source_pk)
         if 'res' in res:
             eventfield_list = res['res'].json().get('fields', {})
