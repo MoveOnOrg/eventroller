@@ -1,21 +1,22 @@
 import re
 
+from django.conf import settings
 from django.contrib import admin
 from django import forms
 from django.utils.html import format_html, mark_safe
 
 from event_store.models import Event
 from reviewer.filters import ReviewerOrganizationFilter, review_widget
-from event_review.filters import (CollapsedListFilter,
+from event_review.filters import (filter_with_emptyvalue,
+                                  CollapsedListFilter,
                                   EventAttendeeMaxFilter,
                                   EventAttendeeCountFilter,
                                   EventFullness,
                                   EventMaxDateFilter,
                                   EventMinDateFilter,
                                   IsPrivateFilter,
-                                  HostConfirmationFilter,
+                                  HostStatusFilter,
                                   PoliticalScopeFilter,
-                                  ReviewFilter,
                                   SortingFilter)
 
 from huerta.filters import CollapsedListFilter, textinputfilter_factory
@@ -26,25 +27,45 @@ def phone_format(phone):
                               phone))
 
 def host_format(event):
-    host_items = []
     host = event.organization_host
-    if not getattr(host, 'email', None):
-        host_items.append(str(host))
+    host_line = [format_html('{}', host)]
+    host_items = []
+    if event.host_is_confirmed:
+        host_line.append(mark_safe(' (<span style="color:green">confirmed</span>) '))
     else:
-        host_items.append(format_html('<a data-system-pk="{}" href="mailto:{}">{}</a>',
+        host_line.append(mark_safe(' (<span style="color:red">unconfirmed</span>) '))
+
+    host_line.append(mark_safe('<br />'))
+
+    if getattr(host, 'email', None):
+        host_items.append(format_html('<a data-system-pk="{}" href="mailto:{}">email</a>',
                                       host.member_system_pk or '',
                                       host.email,
                                       host))
 
-    if event.host_is_confirmed:
-        host_items.append(mark_safe(' (<span style="color:green">confirmed</span>) '))
-    else:
-        host_items.append(mark_safe(' (<span style="color:red">unconfirmed</span>) '))
 
     host_link = event.host_edit_url(edit_access=True)
     if host_link:
         host_items.append(format_html('<a href="{}">Act as host</a>', host_link))
-    return mark_safe(''.join(host_items))
+
+    # from the connector
+    extra_html=event.extra_management_html()
+    if extra_html:
+        host_items.append(extra_html)
+
+    # give settings a chance to tweak/alter/add items
+    customize_host_link = getattr(settings, 'EVENT_REVIEW_CUSTOM_HOST_DISPLAY', None)
+    if callable(customize_host_link):
+        host_items = customize_host_link(event, host_items)
+    host_items.insert(0, ' '.join(host_line))
+    return mark_safe(' <span class="glyphicon glyphicon-star-empty"></span>'.join(host_items))
+
+def long_field(longtext, heading=''):
+    if not longtext:
+        return ''
+    return format_html(heading
+                       + '<div style="max-height: 7.9em; overflow-y: auto" class="well well-sm">{}</div>',
+                       longtext)
 
 def event_list_display(obj, onecol=False):
     scope = obj.get_political_scope_display()
@@ -57,17 +78,18 @@ def event_list_display(obj, onecol=False):
             <div><b>Private Phone:</b> {private_phone}</div>
             <div><b>Event Status:</b> {active_status}</div>
             {review_widget}
+            {internal_notes}
           </div>
         """,
         private_phone=phone_format(obj.private_phone),
         active_status=obj.status,
-        review_widget=review_widget(obj, obj.organization_host_id)
+        review_widget=review_widget(obj, obj.organization_host_id),
+        internal_notes=(long_field(obj.internal_notes,'<b>Past Notes</b>') if obj.internal_notes else '')
         )
     return format_html("""
         <div class="row">
             <div class="col-md-6">
-                <h5>{title} ({pk})</h5>
-                {private}
+                <h5>{title} ({pk}) {private}</h5>
                 <div><b>Host:</b> {host}</div>
                 <div><b>Where:</b>{political_scope}
                     <div>{venue}</div>
@@ -77,6 +99,8 @@ def event_list_display(obj, onecol=False):
                 <div><b>When:</b> {when}</div>
                 <div><b>Attendees:</b> {attendee_count}{max_attendees}</div>
                 <div><b>Description</b> {description}</div>
+                <div><b>Directions</b> {directions}</div>
+                <div><b>Note to Attendees</b> {note_to_attendees}</div>
             </div>
             {second_col}
         </div>
@@ -96,12 +120,9 @@ def event_list_display(obj, onecol=False):
                 if obj.is_private else '',
         host=host_format(obj),
         second_col=second_col,
-        #review_status=obj.organization_status_review,
-        #prep_status=obj.organization_status_prep,
-        #notes=mark_safe('<textarea rows="5" class="form-control" readonly>%s</textarea>' % obj.notes)
-        #    if obj.notes else None,
-        description = mark_safe('<textarea rows="5" class="form-control" readonly>%s</textarea>' % obj.public_description)
-            if obj.public_description else None)
+        description=long_field(obj.public_description),
+        directions=long_field(obj.directions),
+        note_to_attendees=long_field(obj.note_to_attendees))
 
 @admin.register(Event)
 class EventAdmin(admin.ModelAdmin):
@@ -113,14 +134,14 @@ class EventAdmin(admin.ModelAdmin):
     list_display = (event_list_display,)
     list_filter = (ReviewerOrganizationFilter,
                    ('organization_campaign', CollapsedListFilter),
-                   ('organization_status_review', ReviewFilter),
-                   ('organization_status_prep', CollapsedListFilter),
+                   ('organization_status_review', filter_with_emptyvalue('New')),
+                   ('organization_status_prep', filter_with_emptyvalue('Unclaimed')),
                    ('state', CollapsedListFilter),
                    ('political_scope', PoliticalScopeFilter),
                    IsPrivateFilter,
                    EventMinDateFilter,EventMaxDateFilter,
                    ('status', CollapsedListFilter),
-                   HostConfirmationFilter,
+                   HostStatusFilter,
                    EventAttendeeMaxFilter,
                    EventAttendeeCountFilter,
                    EventFullness,
@@ -134,7 +155,10 @@ class EventAdmin(admin.ModelAdmin):
                    textinputfilter_factory('City',
                                            'city'),
                    textinputfilter_factory('Zip',
-                                           'zip'),)
+                                           'zip'),
+                   textinputfilter_factory('Event Id',
+                                           'organization_source_pk'),
+               )
 
     list_display_links = None
 

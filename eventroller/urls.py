@@ -10,6 +10,7 @@ urlpatterns = [
     url(r'^admin/', include(admin.site.urls)),
     url(r'^review/', include('reviewer.urls')),
     url(r'^api/v1/', include('event_exim.urls')),
+    url('^event_review/', include('event_review.urls')),
     url('^', include('django.contrib.auth.urls')),
 ]
 

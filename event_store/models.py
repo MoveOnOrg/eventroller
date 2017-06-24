@@ -205,6 +205,12 @@ class Event(models.Model):
         if src and hasattr(src.api, 'get_host_event_link'):
             return src.api.get_host_event_link(self, edit_access=edit_access)
 
+    def extra_management_html(self):
+        src = self.organization_source
+        if src and hasattr(src.api, 'get_extra_event_management_html'):
+            return src.api.get_extra_event_management_html(self)
+        return ''
+
     def handle_rsvp(self):
         return None #organization can implement
 
@@ -240,11 +246,7 @@ class Event(models.Model):
         if src and src.allows_updates:
             connector = src.api
             if connector and hasattr(connector, 'update_review'):
-                try:
-                    connector.update_review(self, reviews, log_message)
-                except:
-                    # TODO: log this?
-                    pass # we still want to save locally, no matter what the api does
+                connector.update_review(self, reviews, log_message)
         reviewkeys = {
             'prep_status': 'organization_status_prep',
             'review_status': 'organization_status_review'

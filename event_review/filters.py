@@ -25,6 +25,15 @@ class SortingFilter(CollapsedSimpleListFilter):
         return queryset.order_by(val) if val else queryset
 
 
+def filter_with_emptyvalue(empty_value):
+    class Filter(CollapsedListFilter):
+
+        def __init__(self, *args, **kw):
+            CollapsedListFilter.__init__(self, *args, **kw)
+            self.empty_value_display = empty_value
+    return Filter
+
+
 class ReviewFilter(CollapsedListFilter):
 
     def __init__(self, *args, **kw):
@@ -47,16 +56,31 @@ class IsPrivateFilter(CollapsedSimpleListFilter):
         return ((0, 'public'),
                 (1, 'private'))
 
-class HostConfirmationFilter(CollapsedSimpleListFilter):
-    title = "Host confirmation"
-    parameter_name = 'host_confirmed'
+class HostStatusFilter(CollapsedSimpleListFilter):
+    title = "Host status"
+    parameter_name = 'host_status'
     query_arg = 'host_is_confirmed'
-    multiselect_enabled = False
 
     def lookups(self, request, model_admin):
         return ((0, 'unconfirmed'),
-                (1, 'confirmed'))
+                (1, 'confirmed'),
+                (-1, 'No host'))
 
+    def queryset(self, request, queryset):
+        val = self.value()
+        if val:
+            arg = self.query_arg
+            query = None
+            for choice in val.split(','):
+                qparam = Q(**{arg: int(choice)})
+                if choice == '-1':
+                    qparam = Q(organization_host__isnull=True)
+                if query is None:
+                    query = qparam
+                else:
+                    query = query | qparam
+            queryset = queryset.filter(query)
+        return queryset
 
 class EventAttendeeMaxFilter(CollapsedSimpleListFilter):
     title = "Max attendees"

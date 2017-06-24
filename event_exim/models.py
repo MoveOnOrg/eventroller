@@ -82,7 +82,9 @@ class EventSource(models.Model):
         event_data = self.api.load_events(last_updated=last_update)
 
         all_events = {str(e['organization_source_pk']):e for e in event_data['events']}
-        new_host_ids = set([e['organization_host'].member_system_pk for e in all_events.values()])
+        new_host_ids = set([e['organization_host'].member_system_pk
+                            for e in all_events.values()
+                            if e['organization_host']])
         existing = list(Event.objects.filter(organization_source_pk__in=all_events.keys(),
                                              organization_source=self))
         # 2. save hosts, new and existing Activist records

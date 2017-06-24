@@ -167,6 +167,7 @@ USE_TZ = False
 
 STATIC_URL = os.environ.get('STATIC_URL', '/static/')
 STATIC_ROOT = '%s/static_build' % BASE_DIR
+FROM_EMAIL = os.environ.get('FROM_EMAIL', False)
 
 if os.environ.get('LAMBDA_ZAPPA'):
     SECRET_KEY = os.environ.get('DJANGO_BASE_SECRET', SECRET_KEY)
