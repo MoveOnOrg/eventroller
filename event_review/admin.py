@@ -176,5 +176,5 @@ class EventAdmin(admin.ModelAdmin):
 
     def get_queryset(self, *args, **kw):
         qs = super(EventAdmin, self).get_queryset(*args, **kw)
-        qs = qs.select_related('organization_host', 'organization_source')
+        qs = qs.select_related('organization_host', 'organization_source', 'organization')
         return qs

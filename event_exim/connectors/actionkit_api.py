@@ -361,10 +361,10 @@ class Connector:
         return '{}{}'.format(self.base_url, host_link)
 
     def get_extra_event_management_html(self, event):
-        if not getattr(settings, 'FROM_EMAIL', None) or not event.organization_host_id:
+        if not getattr(settings, 'FROM_EMAIL', None) or not event.organization_host_id or not event.organization_host.email:
             return None
         try:
-            api_link = reverse('event_review_host_message', args=[event.id, ''])
+            api_link = reverse('event_review_host_message', args=[event.organization.slug, event.id, ''])
             return render_to_string(
                 'event_exim/actionkit-extra_event_management.html',
                 {'event_id':event.id,
