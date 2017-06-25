@@ -3,6 +3,8 @@ from itertools import chain
 import json
 import re
 
+from django.utils.html import format_html, mark_safe
+
 from actionkit.api.event import AKEventAPI
 from actionkit.api.user import AKUserAPI
 from actionkit.utils import generate_akid
@@ -357,4 +359,20 @@ class Connector:
         return '{}{}'.format(self.base_url, host_link)
 
     def get_extra_event_management_html(self, event):
+        if event.source_json_data:
+            json_data = json.loads(event.source_json_data)
+            hosts = json_data.get('hosts')
+            additional_hosts = []
+            if hosts:
+                for hostpk, host in hosts.items():
+                    if hostpk != event.organization_host.member_system_pk\
+                       and int(hostpk) not in self.ignore_hosts:
+                        additional_hosts.append(host)
+                if additional_hosts:
+                    return mark_safe(
+                        '<div><b>Additional Hosts:</b>'
+                        + ''.join([
+                            format_html('<span data-pk="{}">{}</span>', h['member_system_pk'], h['name'])
+                            for h in additional_hosts])
+                        + '</div>')
         return None
