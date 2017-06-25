@@ -12,6 +12,7 @@ from event_store.models import Activist, CHOICES
 DATE_FMT = '%Y-%m-%dT%H:%M:%S%z'
 
 def strip_tz(datetime):
+    """Strip the timezone for USE_TZ=False"""
     return datetime.replace(tzinfo=None)
 
 class Connector:
@@ -96,11 +97,13 @@ should change.
                                            ' /, e.g. https://www.facebook.com/moveon/'
                                            ' => "moveon" for page_id)'
                                            ' For multiple, separate by commas.'),
-                             required: False},
+                             'required': False},
                 'event_ids': {'help_text': ('event ids are the url after'
                                             '"facebook.com/event/"'
                                             ' This should be a comma separated list for multiple.'),
-                             required: False},
+                             'required': False},
+                'max_paging': {'help_text': 'how many pages (of 25) to iterate back through (default is 10).',
+                               'required': False}
         }
 
     def __init__(self, event_source):
@@ -112,6 +115,7 @@ should change.
         self.auth_token = data.get('auth_token')
         self.page_ids = data.get('page_ids')
         self.event_ids = data.get('event_ids')
+        self.max_paging = data.get('max_paging', 10)
 
     def _convert_host(self, facebook_event):
         owner = facebook_event.get('owner', {})
@@ -158,7 +162,7 @@ should change.
             'is_approved': 1,
             'attendee_count': facebook_event.get('attending_count'),
             'max_attendees': None,
-            'venue': facebook_event.get('place',{}).get('name'),
+            'venue': facebook_event.get('place',{}).get('name',''),
             'public_description': facebook_event['description'],
             'directions': '',
             'note_to_attendees': '',
@@ -208,13 +212,15 @@ should change.
 
 
     def _api_load(self, ids, ids_are_events=True,
-                  since_str='', follow_next=0):
+                  since_str='', follow_next=None):
         """
         Loads events from facebook api.
         if `ids` are comma-separated events, then ids_are_events=True
         if `ids` are comma-separated pages, then ids_are_events=False
         """
         ids = re.sub(r'[^\w,-]', '', ids) # securiteh!
+        if follow_next is None:
+            follow_next = self.max_paging
         params = {"ids": ids,
                   "access_token": self.auth_token}
         fieldlist = ','.join(self.EVENT_FIELDS)
@@ -224,16 +230,13 @@ should change.
         else: #they must be pages
             params['fields'] = "events.fields({0}){1}".format(
                 fieldlist, since_str)
-
-        res = requests.get(
-            '{}{}'.format(self.base_url, self.api_version),
-            params=params)
+        res = requests.get('{}{}'.format(
+            self.base_url, self.api_version), params=params)
         events = res.json()
         # pages return arrays (under events.data)
         # events return the event object directly
         # so we homogenize the output to a single list
-        # TODO (oh, but maybe the PAGE should be the campaign?)
-        #  is the page also the owner?
+        # TODO: maybe the PAGE should be campaign or maybe page=owner?
         if ids_are_events:
             return events.values()
         else:
@@ -241,9 +244,11 @@ should change.
             for page_id, result in events.items():
                 fb_events.extend(result.get('events',{}).get('data',[]))
                 next_link = result.get('events',{}).get('paging',{}).get('next')
-                if next_link and follow_next:
-                    ## TODO: iterate on url
-                    pass
+                while next_link and follow_next > 0:
+                    events = requests.get(next_link).json()
+                    fb_events.extend(events.get('data',[]))
+                    next_link = result.get('paging',{}).get('next')
+                    follow_next = follow_next - 1
             return fb_events
 
     def get_event(self, event_id_or_url):
