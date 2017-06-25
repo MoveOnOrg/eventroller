@@ -20,7 +20,7 @@ def send_host_message(request, organization, event_id, host_id=None):
                 host_link = src.api.get_host_event_link(event, edit_access=True, host_id=event.organization_host.member_system_pk)
                 email_subject = '%s Event Host Login Link' % src.name
                 message = message = render_to_string(
-                    'event_review/email-actionkit_host_login.html',
+                    'event_review/message_to_host_email.html',
                     {'host_name': event.organization_host.name,
                      'event': event,
                      'source': src.name,

@@ -3,6 +3,8 @@ import re
 from django.conf import settings
 from django.contrib import admin
 from django import forms
+from django.template.loader import render_to_string
+from django.urls import reverse, NoReverseMatch
 from django.utils.html import format_html, mark_safe
 
 from event_store.models import Event
@@ -47,6 +49,8 @@ def host_format(event):
     host_link = event.host_edit_url(edit_access=True)
     if host_link:
         host_items.append(format_html('<a href="{}">Act as host</a>', host_link))
+        if getattr(host, 'email', None) and getattr(settings, 'FROM_EMAIL', None):
+            host_items.append(message_to_host(event))
 
     # from the connector
     extra_html=event.extra_management_html()
@@ -59,6 +63,18 @@ def host_format(event):
         host_items = customize_host_link(event, host_items)
     host_items.insert(0, ' '.join(host_line))
     return mark_safe(' <span class="glyphicon glyphicon-star-empty"></span>'.join(host_items))
+
+
+def message_to_host(event):
+    try:
+        api_link = reverse('event_review_host_message', args=[event.organization.slug, event.id, ''])
+        return render_to_string(
+            'event_review/message_to_host_widget.html',
+            {'event_id':event.id,
+             'link': api_link})
+    except NoReverseMatch:
+        return None
+
 
 def long_field(longtext, heading=''):
     if not longtext:
