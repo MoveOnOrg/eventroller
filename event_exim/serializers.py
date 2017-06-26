@@ -6,7 +6,53 @@ from rest_framework import serializers
 
 from event_store.models import Event
 
-class OsdiEventSerializer(HalModelSerializer):
+class OsdiLocationField(serializers.Field):
+
+    mapping = {
+        'venue': 'venue',
+        'postal_code': 'zip',
+        'locality': 'city',
+        'region': 'state'
+    }
+
+    def to_representation(self, obj):
+        return {
+            'venue': obj.venue,
+            'location': {
+                'longitude': obj.longitude,
+                'latitude': obj.latitude,
+            },
+            'postal_code': obj.zip,
+            'locality': obj.city,
+            'region': obj.state
+        }
+
+    def get_attribute(self, obj):
+        return obj
+
+class OsdiLocationGeoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Event
+        fields = ['longitude','latitude']
+
+    def get_attribute(self, obj):
+        return obj
+
+class OsdiLocationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Event
+        fields = ['venue', 'country', 'postal_code', 'locality', 'region', 'location']
+
+    postal_code = serializers.CharField(source="zip", required=False)
+    locality = serializers.CharField(source="city", required=False)
+    region = serializers.CharField(source="state", required=False)
+    location = OsdiLocationGeoSerializer(required=False)
+
+    def get_attribute(self, obj):
+        return obj
+
+
+class OsdiEventSerializer(serializers.ModelSerializer):
     class Meta:
         model = Event
         fields = [
@@ -28,16 +74,16 @@ class OsdiEventSerializer(HalModelSerializer):
             'human_date', #friendly display
         ]
 
-    origin_system = serializers.CharField(source="osdi_origin_system", read_only=True)
-    name = serializers.CharField(source="slug", read_only=True)
+    origin_system = serializers.CharField(source="osdi_origin_system", required=False)
+    name = serializers.CharField(source="slug", required=False)
     #title
-    description = serializers.CharField(source="public_description", read_only=True)
-    browser_url = serializers.CharField(source="url", read_only=True)
-    type = serializers.SerializerMethodField()
+    description = serializers.CharField(source="public_description", required=False)
+    browser_url = serializers.CharField(source="url", required=False)
+    type = serializers.SerializerMethodField(required=False)
     def get_type(self, obj):
         return obj.get_ticket_type_display()
-    total_accepted = serializers.IntegerField(source="attendee_count", read_only=True)
-    status = serializers.SerializerMethodField()
+    total_accepted = serializers.IntegerField(source="attendee_count", required=False)
+    status = serializers.SerializerMethodField(required=False)
     def get_status(self, obj):
         if obj.host_is_confirmed and obj.status == 'active':
             return 'confirmed'
@@ -47,32 +93,33 @@ class OsdiEventSerializer(HalModelSerializer):
             return 'tentative'
 
     # e.g. 2017-07-04T19:00:00
-    start_date = serializers.DateTimeField(source='starts_at', format='iso-8601')
-    #end_date = serializers.DateTimeField(source='ends_at', allow_null=True, format='iso-8601')
+    start_date = serializers.DateTimeField(source='starts_at', format='iso-8601', required=False)
+    end_date = serializers.DateTimeField(source='ends_at', allow_null=True, format='iso-8601', required=False)
 
-    capacity = serializers.IntegerField(source="max_attendees", read_only=True)
-    visibility = serializers.SerializerMethodField()
+    capacity = serializers.IntegerField(source="max_attendees", required=False)
+    visibility = serializers.SerializerMethodField(required=False)
     def get_visibility(self, obj):
         """we are using this strictly as private/public, but is_searchable is different"""
         return obj.get_is_private_display()
-    location = serializers.SerializerMethodField()
-    def get_location(self, obj):
-        return {
-            'venue': obj.venue,
-            'location': {
-                'longitude': obj.longitude,
-                'latitude': obj.latitude,
-            },
-            'postal_code': obj.zip,
-            'locality': obj.city,
-            'region': obj.state
-        }
+    location = OsdiLocationSerializer(required=False)
+    #OsdiLocationSerializer(required=False) #OsdiLocationField()
 
-    human_date = serializers.SerializerMethodField()
+    human_date = serializers.SerializerMethodField(read_only=True)
     def get_human_date(self, obj):
         """e.g. 'Saturday, November 5' """
         return dateformat.format(obj.starts_at, 'l, F j')
-    human_time = serializers.SerializerMethodField()
+    human_time = serializers.SerializerMethodField(read_only=True)
     def get_human_time(self, obj):
         """e.g. '6:30pm' or '5am' """
         return dateformat.format(obj.starts_at, 'fa').replace('.', '')
+
+    def to_internal_value(self, data):
+        internal = super(OsdiEventSerializer,self).to_internal_value(data)
+        # Flatten the location fields into the same internal value
+        if 'location' in internal:
+            loc = internal.pop('location')
+            if 'location' in loc:
+                locloc = loc.pop('location')
+                loc.update(locloc)
+            internal.update(loc)
+        return internal

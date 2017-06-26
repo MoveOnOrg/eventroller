@@ -4,6 +4,7 @@ import time
 
 from django.conf import settings
 from django.contrib.auth.models import User, Group, Permission
+from django.contrib.gis.geos import Point
 from django.db import models
 from django.utils.functional import cached_property
 from django.db.models import Count
@@ -111,6 +112,9 @@ class EventSource(models.Model):
         existing_ids = set([e.organization_source_pk for e in existing])
         new_events = [Event(**e) for e in all_events.values()
                       if e['organization_source_pk'] not in existing_ids]
+        for e in new_events:
+            if e.longitude and e.latitude:
+                e.point = Point(e.longitude, e.latitude)
         Event.objects.bulk_create(new_events)
 
         # 4. save any changes to existing events
@@ -131,6 +135,8 @@ class EventSource(models.Model):
                 if getattr(event,k) != v:
                     setattr(event,k,v)
                     changed = True
+                    if k in ('longitude', 'latitude'):
+                        event.point = Point(event.longitude, event.latitude)
         if changed:
             event.save()
         return changed
