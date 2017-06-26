@@ -3,7 +3,7 @@ import importlib
 import time
 
 from django.conf import settings
-from django.contrib.auth.models import User, Group
+from django.contrib.auth.models import User, Group, Permission
 from django.db import models
 from django.utils.functional import cached_property
 from django.db.models import Count
@@ -18,8 +18,8 @@ from event_review.admin import event_list_display
 
 CRM_TYPES = {
     #'actionkit_db': lambda: connectors.ActionKitDBWrapper,
-    'actionkit_api': lambda: connectors.ActionKitAPIWrapper,
-    #'facebook',
+    'actionkit_api': 1,
+    'facebook': 1,
     #'actionnetwork',
     #'bsd',
     #'csv_uploads',
@@ -45,11 +45,9 @@ class EventSource(models.Model):
 
     #(provided: ping url for update (put this on your thanks page for event creation)
     update_style = models.IntegerField(choices=(
-        (0, 'manual only'),
-        (1, 'ping'),
-        (2, 'ping with event reference'),
+        (0, 'manual or ping only'),
         (3, 'daily pull'),
-        (4, 'hourly'),))
+        (4, 'hourly pull'),))
 
     allows_updates = models.IntegerField(default=0, choices=((0,'no'), (1,'yes')), help_text='as sink')
 
@@ -136,6 +134,84 @@ class EventSource(models.Model):
         if changed:
             event.save()
         return changed
+
+    @classmethod
+    def autocreate_from_settings(cls, source=None, possible_sources=None):
+        from reviewer.models import ReviewGroup
+        if possible_sources is None:
+            possible_sources = getattr(settings, 'EVENT_SOURCES', {})
+        results = {}
+        if source:
+            possible_sources = {k:v for k,v in possible_sources.items() if k==source}
+        for source_name, source_data in possible_sources.items():
+            data = source_data.get('autocreate')
+            #validate
+            if not data:
+                results[source_name] = ['No autocreate key, skipping.']
+            else:
+                eventsource_spec = data.get('event_source')
+                organization_spec = data.get('organization')
+                if not eventsource_spec\
+                   or not organization_spec\
+                   or not set(eventsource_spec).issuperset(['osdi_name', 'crm_type'])\
+                   or not set(organization_spec).issuperset(['title', 'slug', 'osdi_source_id', 'group']):
+                    results[source_name] = [("Not all fields are available for autocreation."
+                                             " See documentation at: "
+                                             "TKTKTK")]
+                    continue
+                else:
+                    # Ok, we have all the data we need.
+                    # Now let's check what objects exist already
+                    db_source = EventSource.objects.filter(name=source_name).first()
+                    db_org = Organization.objects.filter(slug=organization_spec['slug']).first()
+                    if db_source:
+                        results[source_name] = ['Source already exists.']
+                        continue
+                    else:
+                        results[source_name] = ['Creating EventSource %s.' % source_name]
+                        db_source = EventSource(name=source_name)
+                        for field, val in eventsource_spec.items():
+                            if hasattr(db_source, field):
+                                setattr(db_source, field, val)
+                        if not db_org:
+                            db_org = Organization()
+                            for field, val in organization_spec.items():
+                                if field == 'group':
+                                    db_org.group, created = Group.objects.get_or_create(
+                                        name=val)
+                                    if created:
+                                        p = list(Permission.objects.filter(
+                                            content_type__app_label__in=['event_exim', 'event_store'],
+                                            codename__in=['change_eventsource',
+                                                          'change_event',
+                                                          'change_organization']))
+                                        if p:
+                                            db_org.group.permissions.add(*p)
+                                        results[source_name].append('Created organization group %s.' % val)
+                                    else:
+                                        results[source_name].append('Organization group %s already existed.' % val)
+                                elif hasattr(db_org, field):
+                                    setattr(db_org, field, val)
+                        db_source.origin_organization = db_org
+                        db_source.save()
+
+                        review_group = organization_spec.get('review_group')
+                        if review_group:
+                            db_review_group, created = Group.objects.get_or_create(
+                                name=review_group)
+                            if created:
+                                p = list(Permission.objects.filter(
+                                    content_type__app_label='event_store',
+                                    codename='change_event'))
+                                if p:
+                                    db_review_group.permissions.add(*p)
+                                results[source_name].append('Created review group %s.' % review_group)
+                            ReviewGroup.objects.get_or_create(
+                                organization=db_org,
+                                group=db_review_group)
+                            results[source_name].append('Allowed review group review access.')
+        return results
+
 
 class EventDupeManager(models.Manager):
     def create_event_dupe(self, source_event, dupe_event):

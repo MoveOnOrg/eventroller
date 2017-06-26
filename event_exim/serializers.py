@@ -19,7 +19,7 @@ class OsdiEventSerializer(HalModelSerializer):
             'total_accepted',
             'status',
             'start_date',
-            #'end_date', #does anyone use this?
+            'end_date', #does anyone use this?
             'capacity',
             'visibility',
             'location',
@@ -39,7 +39,13 @@ class OsdiEventSerializer(HalModelSerializer):
     total_accepted = serializers.IntegerField(source="attendee_count", read_only=True)
     status = serializers.SerializerMethodField()
     def get_status(self, obj):
-        return 'confirmed' if (obj.host_is_confirmed and obj.status == 'active') else obj.status
+        if obj.host_is_confirmed and obj.status == 'active':
+            return 'confirmed'
+        elif obj.status == 'cancelled':
+            return 'cancelled'
+        else:
+            return 'tentative'
+
     # e.g. 2017-07-04T19:00:00
     start_date = serializers.DateTimeField(source='starts_at', format='iso-8601')
     #end_date = serializers.DateTimeField(source='ends_at', allow_null=True, format='iso-8601')

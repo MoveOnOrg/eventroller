@@ -14,4 +14,7 @@ class PublicEventViewSet(ModelViewSet):
 
     def get_queryset(self):
         #self.request.query_params
-        return Event.objects.filter(is_searchable=True, is_private=False)
+        # TODO: exclude based on review
+        return Event.objects.filter(
+            is_searchable=True, is_private=False).exclude(
+                organization_status_review__in=('questionable', 'limbo'))
