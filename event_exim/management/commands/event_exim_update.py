@@ -13,6 +13,9 @@ class Command(BaseCommand):
         parser.add_argument('--source',
                             help='event source name',
                             type=str)
+        parser.add_argument('--event_pk',
+                            help='event source system pk of the event',
+                            type=str)
         parser.add_argument('--update_style',
                             help="\n".join(['which event sources should be updated?',
                                             ' 0=all manual only sources',
@@ -24,6 +27,10 @@ class Command(BaseCommand):
                             help=('Use this to override what to consider the last update.'
                                   ' Note that this may be a different kind of value per-connector'),
                             type=str)
+        parser.add_argument('--from_start',
+                            help=('Do not use last_update from database -- load from beginning again'),
+                            default=False,
+                            type=bool)
 
     def handle(self, *args, **options):
         sources = []
@@ -38,5 +45,10 @@ class Command(BaseCommand):
             kwargs = {}
             if options['last_update'] is not None:
                 kwargs['last_update'] = options['last_update']
-            print('updating', s, options['last_update'] or '')
-            s.update_events(**kwargs)
+            if options['from_start']:
+                kwargs['last_update'] = ''
+            if options['event_pk']:
+                print(s.update_event(options['event_pk']))
+            else:
+                print('updating', s, options['last_update'] or '')
+                s.update_events(**kwargs)

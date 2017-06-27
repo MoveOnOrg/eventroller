@@ -63,7 +63,8 @@ class Connector:
                      'updated_at']
 
     other_fields = ['ee.id', 'ee.creator_id', 'ee.campaign_id', 'ee.phone', 'ee.notes',
-                    'ec.title', 'signuppage.name', 'createpage.name', 'host.id', 'hostaction.action_ptr_id',
+                    'ec.title', 'signuppage.name', 'createpage.name',
+                    'host.id', 'hostaction.id', 'hostaction2.action_ptr_id', 'hostcreateaction.action_ptr_id',
                     'u.id', 'u.first_name', 'u.last_name', 'u.email', 'loc.us_district', 'recentphone.value']
 
     event_fields = ['review_status', 'prep_status',
@@ -88,12 +89,15 @@ class Connector:
         " LEFT JOIN core_location loc ON (loc.user_id = u.id)"
         " JOIN core_eventsignuppage ces ON (ces.campaign_id = ee.campaign_id)"
         " JOIN core_page signuppage ON (signuppage.id = ces.page_ptr_id AND signuppage.hidden=0 AND signuppage.status='active')"
-        " LEFT JOIN core_eventcreateaction hostaction ON (hostaction.event_id = ee.id)"
+        " LEFT JOIN core_eventcreateaction hostcreateaction ON (hostcreateaction.event_id = ee.id)"
+        " LEFT JOIN core_action hostaction ON (hostcreateaction.action_ptr_id = hostaction.id AND hostaction.user_id=host.user_id)"
+        " LEFT JOIN core_eventsignupaction hostaction2 ON (hostaction2.signup_id = host.id)"
         " LEFT JOIN core_eventcreatepage cec ON (cec.campaign_id = ee.campaign_id)"
         " LEFT JOIN core_page createpage ON (createpage.id = cec.page_ptr_id AND createpage.hidden=0 AND createpage.status='active')"
         " %(eventjoins)s "
         " xxADDITIONAL_WHERExx " #will be replaced with text or empty string on run
-        " GROUP BY ee.id, host.id"
+        # we need to include hostcreateaction in group by so it doesn't get squashed with first match
+        " GROUP BY ee.id, host.id, hostcreateaction.action_ptr_id"
         " ORDER BY {{ ordering }} DESC"
         " LIMIT {{ max_results }}"
         " OFFSET {{ offset }}"
@@ -118,10 +122,15 @@ class Connector:
                             'required': True},
                 'api_user': {'help_text': 'api username',
                              'required': True},
-                'max_event_load': {'help_text': 'The default number of events to back-load from the database.  (if not set, then it will go all the way back)',
+                'max_event_load': {'help_text': ('The default number of events to back-load from'
+                                                 ' the database. (if not set, then it will go'
+                                                 'all the way back)'),
                                    'required': False},
                 'base_url': {'help_text': 'base url like "https://roboticdocs.actionkit.com"',
-                                  'required': True},
+                             'required': True},
+                'allowed_hosts': {'help_text': ('defaults to base_url host, but if you have other'
+                                                ' hosts that should be allowed to ping as the client'),
+                                  'required': False},
                 'ak_secret': {'help_text': 'actionkit "Secret" needed for auto-login tokens',
                               'required': False},
                 'ignore_host_ids': {'help_text': ('if you want to ignore certain hosts'
@@ -152,6 +161,12 @@ class Connector:
                                      if re.match(r'^\d+$', h)
                                  ])
         self.cohost_id = data.get('cohost_id')
+        self._allowed_hosts = set(data['base_url'].split('/')[2])
+        if data.get('allowed_hosts'):
+            self._allowed_hosts.update(data['allowed_hosts'].split(','))
+
+    def allowed_hosts(self):
+        return self._allowed_hosts
 
     def _load_events_from_sql(self, ordering='ee.updated_at', max_results=10000, offset=0,
                               additional_where=[], additional_params={}):
@@ -189,8 +204,13 @@ class Connector:
                     hashed_email=Activist.hash(event_row[fi['u.email']]),
                     phone=event_row[fi['recentphone.value']],
                     #non Activist fields:
-                    create_action=event_row[fi['hostaction.action_ptr_id']]
-                )
+                    # we try hostaction2 -- a signup instead of create, first,
+                    # because if there's a signup, there won't be a create
+                    # however the create action will join on all events
+                    # since the create action is just based on event_id, not the user
+                    create_action=(event_row[fi['hostaction2.action_ptr_id']]
+                                   or event_row[fi['hostaction.id']])
+        )
 
     def _convert_event(self, event_rows):
         """
@@ -224,7 +244,10 @@ class Connector:
             hostpk = int(host['member_system_pk'])
             if not main_host_id and hostpk not in self.ignore_hosts:
                 main_host_id = hostpk
-            hosts[hostpk] = host
+            # put the first one in hosts, and then only update
+            #  if we have a create_action row
+            if hostpk not in hosts or host.get('create_action'):
+                hosts[hostpk] = host
             if hostpk == self.cohost_id:
                 cohost_create_action = host['create_action']
 

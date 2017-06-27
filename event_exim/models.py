@@ -72,16 +72,27 @@ class EventSource(models.Model):
             connector_module = importlib.import_module('event_exim.connectors.%s' % self.crm_type)
             return connector_module.Connector(self)
 
+    def update_event(self, source_pk):
+        event_dict = self.api.get_event(source_pk)
+        if event_dict:
+            self.update_events_from_dicts([event_dict])
+        return event_dict
+
     def update_events(self, last_update=None):
         """
         Sync events from source to local database
         """
-        # 1. load events from our connector
+        # load events from our connector
         if last_update is None:
             last_update = self.last_update
         event_data = self.api.load_events(last_updated=last_update)
+        self.update_events_from_dicts(event_data['events'])
+        # now that we've updated things, save this EventSource record with last_updated
+        self.last_update = event_data['last_updated']
+        self.save()
 
-        all_events = {str(e['organization_source_pk']):e for e in event_data['events']}
+    def update_events_from_dicts(self, event_dicts):
+        all_events = {str(e['organization_source_pk']):e for e in event_dicts}
         new_host_ids = set([e['organization_host'].member_system_pk
                             for e in all_events.values()
                             if e['organization_host']])
@@ -115,12 +126,9 @@ class EventSource(models.Model):
 
         # 4. save any changes to existing events
         for e in existing:
-            self.update_event(e, all_events[e.organization_source_pk])
-        # 5. now that we've updated things, save this EventSource record with last_updated
-        self.last_update = event_data['last_updated']
-        self.save()
+            self.update_event_from_dict(e, all_events[e.organization_source_pk])
 
-    def update_event(self, event, new_event_dict):
+    def update_event_from_dict(self, event, new_event_dict):
         changed = False
         for k,v in new_event_dict.items():
             if k == 'organization_host' and event.organization_host:
