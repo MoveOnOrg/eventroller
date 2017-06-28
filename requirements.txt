@@ -1,4 +1,5 @@
 # sudo apt-get install build-essential libssl-dev libffi-dev python-dev libmysqlclient-dev postgresql-server-dev-all python3-openssl python3-dev
+# if you don't have pip>=9, run pip install --upgrade pip
 
 Django==1.10
 # Include https://github.com/tzangms/django-bootstrap-form/pull/88 fix. Can change to version number when version increments above 3.2.1
