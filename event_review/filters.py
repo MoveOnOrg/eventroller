@@ -154,3 +154,7 @@ class EventMaxDateFilter(EventMinDateFilter):
     title = "events starting on or before"
     parameter_name = "maxdate"
     query_arg = 'starts_at__lte'
+
+
+class CampaignFilter(CollapsedListFilter):
+    order_by = '-created_at'
