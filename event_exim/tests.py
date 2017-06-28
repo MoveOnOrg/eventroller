@@ -3,9 +3,6 @@ import re
 
 from django.test import Client, TestCase, override_settings
 
-from recruit.models import Volunteer, Signup, Shift
-from recruit.emails import thank_you_email, cancel_shift_email, reminder_email
-
 """
 >>> response = c.post('/login/', {'username': 'john', 'password': 'smith'})
 >>> response.status_code
@@ -22,12 +19,13 @@ https://docs.djangoproject.com/en/1.9/topics/testing/tools/#assertions
 """
 TESTSETTINGS = {
     'TESTING': True,
+    'EVENT_PUBLIC_API': True,
     # add other custom settings here
 }
 @override_settings(**TESTSETTINGS)
 class VolunteerTestCase(TestCase):
 
-    fixtures = ['baserecruit_fixtures']
+    #fixtures = ['baserecruit_fixtures']
 
     def setUp(self):
         self.c = Client()
