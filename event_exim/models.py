@@ -206,6 +206,7 @@ class EventSource(models.Model):
                                         results[source_name].append('Organization group %s already existed.' % val)
                                 elif hasattr(db_org, field):
                                     setattr(db_org, field, val)
+                            db_org.save()
                         db_source.origin_organization = db_org
                         db_source.save()
 

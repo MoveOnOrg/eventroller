@@ -8,6 +8,7 @@ from django.utils.html import format_html, mark_safe
 from event_store.models import Event
 from reviewer.filters import ReviewerOrganizationFilter, review_widget
 from event_review.filters import (filter_with_emptyvalue,
+                                  CampaignFilter,
                                   CollapsedListFilter,
                                   EventAttendeeMaxFilter,
                                   EventAttendeeCountFilter,
@@ -133,7 +134,7 @@ class EventAdmin(admin.ModelAdmin):
     list_striped = True
     list_display = (event_list_display,)
     list_filter = (ReviewerOrganizationFilter,
-                   ('organization_campaign', CollapsedListFilter),
+                   ('organization_campaign', CampaignFilter),
                    ('organization_status_review', filter_with_emptyvalue('New')),
                    ('organization_status_prep', filter_with_emptyvalue('Unclaimed')),
                    ('state', CollapsedListFilter),
@@ -156,8 +157,9 @@ class EventAdmin(admin.ModelAdmin):
                                            'city'),
                    textinputfilter_factory('Zip',
                                            'zip'),
-                   textinputfilter_factory('Event Id',
-                                           'organization_source_pk'),
+                   textinputfilter_factory('Event Ids (comma-separated)',
+                                           'organization_source_pk',
+                                           accept_multiple=True),
                )
 
     list_display_links = None
