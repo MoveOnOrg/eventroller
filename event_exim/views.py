@@ -61,9 +61,9 @@ class PublicEventViewSet(ModelViewSet):
                     coords = Point(zipcode.longitude, zipcode.latitude)
             if coords:
                 queryset = queryset.filter(point__distance_lt=(coords, Distance(m=int(distance_max))))
-        _filter = rGET.get('$filter')
-        if _filter:
-            odata_query = odata.django_filter(_filter, OsdiEventSerializer.odata_field_mapper)
-            if odata_query:
-                queryset = queryset.filter(odata_query)
+        odata_filters = odata.django_params(rGET, OsdiEventSerializer.odata_field_mapper)
+        if 'filter' in odata_filters:
+            queryset = queryset.filter(odata_filters['filter'])
+        if 'orderby' in odata_filters:
+            queryset = queryset.order_by(*odata_filters['orderby'])
         return queryset
