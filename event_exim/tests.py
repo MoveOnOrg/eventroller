@@ -23,13 +23,16 @@ TESTSETTINGS = {
     # add other custom settings here
 }
 @override_settings(**TESTSETTINGS)
-class VolunteerTestCase(TestCase):
+class SmokeTestCase(TestCase):
 
     #fixtures = ['baserecruit_fixtures']
 
     def setUp(self):
         self.c = Client()
 
-    def test_volunteer_blankvisit(self):
-        xxx = self.c.get('/foo/bar/')
-        self.assertContains(xxx, 'yyy')
+    def test_api_route(self):
+        response = self.c.get('/api/v1/events/')
+        self.assertEqual(response.status_code, 200)
+
+    def test_api_content_type(self):
+        self.assertEqual(response['content-type'], 'application/json')
