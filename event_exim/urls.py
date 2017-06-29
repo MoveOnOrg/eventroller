@@ -4,7 +4,7 @@ from django.conf.urls import include, url
 from event_exim import views
 
 public_patterns = [
-    url(r'^events/$', views.PublicEventViewSet.as_view({'get': 'list'}),
+    url(r'^events/?$', views.PublicEventViewSet.as_view({'get': 'list'}),
         name='osdi_public_events'),
 ]
 refresh_patterns = [
