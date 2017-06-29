@@ -13,12 +13,12 @@ def send_host_message(request, organization, event_id, host_id=None):
     result = 'failed to send'
 
     if getattr(settings, 'FROM_EMAIL', None):
-        event = Event.objects.filter(id=event_id).select_related('organization_host').first()
+        event = Event.objects.filter(id=event_id).select_related('organization_host', 'organization').first()
         if event and event.organization_host_id and event.organization_host.email:
             src = event.organization_source
             if src and hasattr(src.api, 'get_host_event_link'):
                 host_link = src.api.get_host_event_link(event, edit_access=True, host_id=event.organization_host.member_system_pk)
-                email_subject = 'Regarding your event with %s' % src.name
+                email_subject = 'Regarding your event with %s' % event.organization.title
                 message = message = render_to_string(
                     'event_review/message_to_host_email.html',
                     {'host_name': event.organization_host.name,
