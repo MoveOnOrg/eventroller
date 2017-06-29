@@ -18,14 +18,17 @@ def send_host_message(request, organization, event_id, host_id=None):
             src = event.organization_source
             if src and hasattr(src.api, 'get_host_event_link'):
                 host_link = src.api.get_host_event_link(event, edit_access=True, host_id=event.organization_host.member_system_pk)
-                email_subject = '%s Event Host Login Link' % src.name
+                email_subject = 'Regarding your event with %s' % src.name
                 message = message = render_to_string(
                     'event_review/message_to_host_email.html',
                     {'host_name': event.organization_host.name,
                      'event': event,
                      'source': src.name,
                      'link': host_link,
-                     'message': request.POST.get('message','')})
+                     'message': request.POST.get('message',''),
+                     'footer': getattr(settings, 'EVENT_REVIEW_MESSAGE_FOOTER',
+                                       "\nThanks for all you do.")
+                 })
                 send_mail(email_subject, message, settings.FROM_EMAIL, [event.organization_host.email])
                 result = 'success'
 
