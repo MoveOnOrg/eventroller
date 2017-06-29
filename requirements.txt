@@ -5,6 +5,7 @@ Django==1.11.1
 git+https://github.com/tzangms/django-bootstrap-form.git@5fff56f715bd9f2f29793f6a5a87baa1be25e409#egg=django-bootstrap-form
 -e git+https://github.com/MoveOnOrg/huerta.git@master#egg=huerta
 -e git+https://github.com/MoveOnOrg/python-actionkit.git@public-master#egg=python-actionkit
+-e git+https://github.com/MoveOnOrg/django-odata.git@master#egg=odata
 
 mysqlclient==1.3.7
 psycopg2==2.7.1

@@ -123,3 +123,15 @@ class OsdiEventSerializer(serializers.ModelSerializer):
                 loc.update(locloc)
             internal.update(loc)
         return internal
+
+    @classmethod
+    def odata_field_mapper(cls, fieldtuple):
+        """
+        Maps a field tuple like ("location", "region")
+        to the django filter value (like 'region' for the above)
+        """
+        target = cls()
+        for f in fieldtuple:
+            target = target[f]
+        if target:
+            return target.source

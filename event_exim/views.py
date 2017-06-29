@@ -4,11 +4,11 @@ import re
 
 from django.conf import settings
 from django.contrib.gis.geos import Point
-from django.contrib.gis.measure import Distance 
-
-from django.conf import settings
+from django.contrib.gis.measure import Distance
 from django.http import HttpResponse
 from django.shortcuts import render, get_object_or_404
+
+import odata
 from osdi.pagination import OsdiPagination
 from rest_framework.viewsets import ModelViewSet
 
@@ -61,4 +61,9 @@ class PublicEventViewSet(ModelViewSet):
                     coords = Point(zipcode.longitude, zipcode.latitude)
             if coords:
                 queryset = queryset.filter(point__distance_lt=(coords, Distance(m=int(distance_max))))
+        _filter = rGET.get('$filter')
+        if _filter:
+            odata_query = odata.django_filter(_filter, OsdiEventSerializer.odata_field_mapper)
+            if odata_query:
+                queryset = queryset.filter(odata_query)
         return queryset
