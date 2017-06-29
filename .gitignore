@@ -11,6 +11,7 @@ site-packages
 *.sass-cache
 .env
 src
+eventroller.egg-info
 
 # Elastic Beanstalk Files
 #commenting out -- but we'll have to add this if this became a public repo

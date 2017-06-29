@@ -3,9 +3,7 @@ from itertools import chain
 import json
 import re
 
-from django.conf import settings
-from django.template.loader import render_to_string
-from django.urls import reverse, NoReverseMatch
+from django.utils.html import format_html, mark_safe
 
 from actionkit.api.event import AKEventAPI
 from actionkit.api.user import AKUserAPI
@@ -384,13 +382,20 @@ class Connector:
         return '{}{}'.format(self.base_url, host_link)
 
     def get_extra_event_management_html(self, event):
-        if not getattr(settings, 'FROM_EMAIL', None) or not event.organization_host_id:
-            return None
-        try:
-            api_link = reverse('event_review_host_message', args=[event.id, ''])
-            return render_to_string(
-                'event_exim/actionkit-extra_event_management.html',
-                {'event_id':event.id,
-                 'link': api_link})
-        except NoReverseMatch:
-            return None
+        if event.source_json_data:
+            json_data = json.loads(event.source_json_data)
+            hosts = json_data.get('hosts')
+            additional_hosts = []
+            if hosts:
+                for hostpk, host in hosts.items():
+                    if hostpk != event.organization_host.member_system_pk\
+                       and int(hostpk) not in self.ignore_hosts:
+                        additional_hosts.append(host)
+                if additional_hosts:
+                    return mark_safe(
+                        '<div><b>Additional Hosts:</b>'
+                        + ''.join([
+                            format_html('<span data-pk="{}">{}</span>', h['member_system_pk'], h['name'])
+                            for h in additional_hosts])
+                        + '</div>')
+        return None
