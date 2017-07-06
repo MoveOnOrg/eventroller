@@ -391,8 +391,9 @@ class Connector:
             additional_hosts = []
             if hosts:
                 for hostpk, host in hosts.items():
-                    if hostpk != event.organization_host.member_system_pk\
-                       and int(hostpk) not in self.ignore_hosts:
+                    if int(hostpk) not in self.ignore_hosts\
+                       and (not event.organization_host_id\
+                            or hostpk != event.organization_host.member_system_pk):
                         additional_hosts.append(host)
                 if additional_hosts:
                     return mark_safe(
