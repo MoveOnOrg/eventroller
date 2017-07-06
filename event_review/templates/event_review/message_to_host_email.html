@@ -1,11 +1,11 @@
-{% autoescape off %}Hi {{host_name}},
+{% autoescape off %}Hi, {{host_name}}!
 
 {{message}}
 
 You can access your host page for the event here:
 {{link|safe}}
 
-This message is regarding your event {{event.title}} on {{event.starts_at|date:'l, F j fa'}}.
+This message is regarding your event {{event.title}} on {{event.starts_at|date:'l, F j fa'}}
 {{footer}}
 {% comment %}
 NOTE that autoescape is off here -- that is because
