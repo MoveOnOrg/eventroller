@@ -2,6 +2,7 @@ import datetime
 from itertools import chain
 import json
 import re
+from urllib.parse import quote as urlquote
 
 from django.utils.html import format_html, mark_safe
 
@@ -349,7 +350,7 @@ class Connector:
                 return '{}/admin/events/event/?campaign={cid}&event_id={eid}'.format(
                     self.base_url, cid=cid, eid=event.organization_source_pk)
 
-    def get_host_event_link(self, event, edit_access=False, host_id=None):
+    def get_host_event_link(self, event, edit_access=False, host_id=None, confirm=False):
         if event.status != 'active':
             return None
         jsondata = event.source_json_data
@@ -370,6 +371,8 @@ class Connector:
                 # no host to use.
                 # maybe todo: use event host, but need to think of auth/consequences
                 return None
+        elif confirm:
+            host_link = urlquote(host_link + '?confirmed=1')
 
         if edit_access and host_id and self.akapi.secret:
             #easy memoization for a single user
