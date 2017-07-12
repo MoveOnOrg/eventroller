@@ -182,7 +182,7 @@ class Connector:
         query = {'query': self.sql_query.replace('xxADDITIONAL_WHERExx', where_clause),
                  'ordering': ordering,
                  'max_results': max_results,
-                 'refresh': 1,
+                 'refresh': True,
                  'offset': offset}
         query.update(additional_params)
         res = self.akapi.client.post('{}/rest/v1/report/run/sql/'.format(self.base_url),
