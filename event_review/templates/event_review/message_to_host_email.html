@@ -1,0 +1,16 @@
+{% autoescape off %}Hi, {{host_name}}!
+
+{{message}}
+
+You can access your host page for the event here:
+{{link|safe}}
+
+This message is regarding your event {{event.title}} on {{event.starts_at|date:'l, F j fa'}}
+{{footer}}
+{% comment %}
+NOTE that autoescape is off here -- that is because
+it is sent as TEXT in the email, and:
+1. We don't want to escape things like apostrophes
+2. no html should be interpreted by mail clients
+{% endcomment %}
+{% endautoescape %}

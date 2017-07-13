@@ -2,10 +2,9 @@ import datetime
 from itertools import chain
 import json
 import re
+from urllib.parse import quote as urlquote
 
-from django.conf import settings
-from django.template.loader import render_to_string
-from django.urls import reverse, NoReverseMatch
+from django.utils.html import format_html, mark_safe
 
 from actionkit.api.event import AKEventAPI
 from actionkit.api.user import AKUserAPI
@@ -183,6 +182,7 @@ class Connector:
         query = {'query': self.sql_query.replace('xxADDITIONAL_WHERExx', where_clause),
                  'ordering': ordering,
                  'max_results': max_results,
+                 'refresh': True,
                  'offset': offset}
         query.update(additional_params)
         res = self.akapi.client.post('{}/rest/v1/report/run/sql/'.format(self.base_url),
@@ -351,7 +351,7 @@ class Connector:
                 return '{}/admin/events/event/?campaign={cid}&event_id={eid}'.format(
                     self.base_url, cid=cid, eid=event.organization_source_pk)
 
-    def get_host_event_link(self, event, edit_access=False, host_id=None):
+    def get_host_event_link(self, event, edit_access=False, host_id=None, confirm=False):
         if event.status != 'active':
             return None
         jsondata = event.source_json_data
@@ -372,6 +372,8 @@ class Connector:
                 # no host to use.
                 # maybe todo: use event host, but need to think of auth/consequences
                 return None
+        elif confirm:
+            host_link = urlquote(host_link + '?confirmed=1')
 
         if edit_access and host_id and self.akapi.secret:
             #easy memoization for a single user
@@ -384,13 +386,21 @@ class Connector:
         return '{}{}'.format(self.base_url, host_link)
 
     def get_extra_event_management_html(self, event):
-        if not getattr(settings, 'FROM_EMAIL', None) or not event.organization_host_id:
-            return None
-        try:
-            api_link = reverse('event_review_host_message', args=[event.id, ''])
-            return render_to_string(
-                'event_exim/actionkit-extra_event_management.html',
-                {'event_id':event.id,
-                 'link': api_link})
-        except NoReverseMatch:
-            return None
+        if event.source_json_data:
+            json_data = json.loads(event.source_json_data)
+            hosts = json_data.get('hosts')
+            additional_hosts = []
+            if hosts:
+                for hostpk, host in hosts.items():
+                    if int(hostpk) not in self.ignore_hosts\
+                       and (not event.organization_host_id\
+                            or hostpk != event.organization_host.member_system_pk):
+                        additional_hosts.append(host)
+                if additional_hosts:
+                    return mark_safe(
+                        '<div><b>Additional Hosts:</b>'
+                        + ''.join([
+                            format_html('<span data-pk="{}">{}</span>', h['member_system_pk'], h['name'])
+                            for h in additional_hosts])
+                        + '</div>')
+        return None

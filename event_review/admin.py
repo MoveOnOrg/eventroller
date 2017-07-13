@@ -3,6 +3,8 @@ import re
 from django.conf import settings
 from django.contrib import admin
 from django import forms
+from django.template.loader import render_to_string
+from django.urls import reverse, NoReverseMatch
 from django.utils.html import format_html, mark_safe
 
 from event_store.models import Event
@@ -48,6 +50,8 @@ def host_format(event):
     host_link = event.host_edit_url(edit_access=True)
     if host_link:
         host_items.append(format_html('<a href="{}">Act as host</a>', host_link))
+        if getattr(host, 'email', None) and getattr(settings, 'FROM_EMAIL', None):
+            host_items.append(message_to_host(event))
 
     # from the connector
     extra_html=event.extra_management_html()
@@ -60,6 +64,18 @@ def host_format(event):
         host_items = customize_host_link(event, host_items)
     host_items.insert(0, ' '.join(host_line))
     return mark_safe(' <span class="glyphicon glyphicon-star-empty"></span>'.join(host_items))
+
+
+def message_to_host(event):
+    try:
+        api_link = reverse('event_review_host_message', args=[event.organization.slug, event.id, ''])
+        return render_to_string(
+            'event_review/message_to_host_widget.html',
+            {'event_id':event.id,
+             'link': api_link})
+    except NoReverseMatch:
+        return None
+
 
 def long_field(longtext, heading=''):
     if not longtext:
@@ -135,8 +151,8 @@ class EventAdmin(admin.ModelAdmin):
     list_display = (event_list_display,)
     list_filter = (ReviewerOrganizationFilter,
                    ('organization_campaign', CampaignFilter),
-                   ('organization_status_review', filter_with_emptyvalue('New')),
-                   ('organization_status_prep', filter_with_emptyvalue('Unclaimed')),
+                   ('organization_status_review', filter_with_emptyvalue('new')),
+                   ('organization_status_prep', filter_with_emptyvalue('unclaimed')),
                    ('state', CollapsedListFilter),
                    ('political_scope', PoliticalScopeFilter),
                    IsPrivateFilter,
@@ -147,17 +163,17 @@ class EventAdmin(admin.ModelAdmin):
                    EventAttendeeCountFilter,
                    EventFullness,
                    SortingFilter,
-                   textinputfilter_factory('Title',
+                   textinputfilter_factory('title',
                                            'title'),
-                   textinputfilter_factory('Host Email',
+                   textinputfilter_factory('host email',
                                            'organization_host__email'),
-                   textinputfilter_factory('Host Name',
+                   textinputfilter_factory('host name',
                                            'organization_host__name'),
-                   textinputfilter_factory('City',
+                   textinputfilter_factory('city',
                                            'city'),
-                   textinputfilter_factory('Zip',
+                   textinputfilter_factory('zip',
                                            'zip'),
-                   textinputfilter_factory('Event Ids (comma-separated)',
+                   textinputfilter_factory('event ID number (comma-separated)',
                                            'organization_source_pk',
                                            accept_multiple=True),
                )
@@ -178,5 +194,5 @@ class EventAdmin(admin.ModelAdmin):
 
     def get_queryset(self, *args, **kw):
         qs = super(EventAdmin, self).get_queryset(*args, **kw)
-        qs = qs.select_related('organization_host', 'organization_source')
+        qs = qs.select_related('organization_host', 'organization_source', 'organization')
         return qs

@@ -8,7 +8,7 @@ from event_store.models import EVENT_REVIEW_CHOICES, Event
 
 
 class SortingFilter(CollapsedSimpleListFilter):
-    title = "Sorting"
+    title = "sorting"
     parameter_name = "sorting"
     multiselect_enabled = False
 
@@ -17,7 +17,7 @@ class SortingFilter(CollapsedSimpleListFilter):
                 ('starts_at', 'Earliest'),
                 ('-max_attendees', 'Largest max attendees'),
                 ('-attendee_count', 'Most attendee signups'),
-                ('zip', 'Zipcode'),
+                ('zip', 'ZIP Code'),
         )
 
     def queryset(self, request, queryset):
@@ -47,7 +47,7 @@ class PoliticalScopeFilter(CollapsedListFilter):
 
 
 class IsPrivateFilter(CollapsedSimpleListFilter):
-    title = "Private or public"
+    title = "private or public"
     parameter_name = 'is_private'
     query_arg = 'is_private'
     multiselect_enabled = False
@@ -57,14 +57,14 @@ class IsPrivateFilter(CollapsedSimpleListFilter):
                 (1, 'private'))
 
 class HostStatusFilter(CollapsedSimpleListFilter):
-    title = "Host status"
+    title = "host status"
     parameter_name = 'host_status'
     query_arg = 'host_is_confirmed'
 
     def lookups(self, request, model_admin):
         return ((0, 'unconfirmed'),
                 (1, 'confirmed'),
-                (-1, 'No host'))
+                (-1, 'no host'))
 
     def queryset(self, request, queryset):
         val = self.value()
@@ -83,7 +83,7 @@ class HostStatusFilter(CollapsedSimpleListFilter):
         return queryset
 
 class EventAttendeeMaxFilter(CollapsedSimpleListFilter):
-    title = "Max attendees"
+    title = "max attendees"
     parameter_name = "maxattendees"
     query_arg = 'max_attendees__range'
 
@@ -112,13 +112,13 @@ class EventAttendeeMaxFilter(CollapsedSimpleListFilter):
 
 
 class EventAttendeeCountFilter(EventAttendeeMaxFilter):
-    title = "Attending RSVP count"
+    title = "attending RSVP count"
     parameter_name = "attending"
     query_arg = 'attendee_count__range'
 
 
 class EventFullness(CollapsedSimpleListFilter):
-    title = "How full is the event"
+    title = "how full is the event"
     parameter_name = "fullness"
     multiselect_enabled = False
 

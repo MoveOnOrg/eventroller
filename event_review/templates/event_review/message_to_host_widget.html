@@ -1,0 +1,52 @@
+<a id="send-host-message--{{event_id}}" href="{{link|safe}}" >Send message to host</a>
+<div id="send-host-message-status--{{event_id}}" class="hidden">
+  <b style="vertical-align:top">Message:</b>
+  <textarea rows="2" style="min-width: 50%;" placeholder="Optional message to host. Email will include a link to manage the event."></textarea>
+  <button class="btn btn-sm" style="vertical-align:top">Send</button>
+  <span></span>
+</div>
+<script>
+$('#send-host-message--{{event_id}}').click(function(evt) {
+    var $link = $('#send-host-message--{{event_id}}');
+    var $status = $('#send-host-message-status--{{event_id}}');
+    $status.removeClass('hidden');
+    $('button', $status).removeClass('hidden');
+    evt.preventDefault();
+    return false;
+});
+
+$('#send-host-message-status--{{event_id}} button').click(function(evt) {
+  evt.preventDefault();
+  var $link = $('#send-host-message--{{event_id}}');
+  var $status = $('#send-host-message-status--{{event_id}}');
+  $(this).addClass('hidden');
+  var $msgSpan = $('span', $status)
+    .text('Sending ...')
+    .attr('class', 'label label-warning');
+  $.ajax({"method": "POST",
+          "url": $link.attr('href'),
+          "data": {
+            'message': $('textarea', $status).val(),
+            'csrfmiddlewaretoken': $('input[name=csrfmiddlewaretoken]').val()
+          }
+         })
+    .then(function success(data) {
+      console.log(data);
+      console.log(data.result);
+      if (data.result == 'success') {
+        $msgSpan
+          .text('Sent')
+          .attr('class', 'label label-success');
+      } else {
+        $msgSpan
+          .text('Error: ' + data.result)
+          .attr('class', 'label label-danger');
+      }
+    }, function error(data) {
+      $msgSpan
+        .text('Error')
+        .attr('class', 'label label-danger');
+    });
+  return false;
+});
+</script>
