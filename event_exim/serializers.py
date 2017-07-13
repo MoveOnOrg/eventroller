@@ -6,29 +6,6 @@ from rest_framework import serializers
 
 from event_store.models import Event
 
-class OsdiLocationField(serializers.Field):
-
-    mapping = {
-        'venue': 'venue',
-        'postal_code': 'zip',
-        'locality': 'city',
-        'region': 'state'
-    }
-
-    def to_representation(self, obj):
-        return {
-            'venue': obj.venue,
-            'location': {
-                'longitude': obj.longitude,
-                'latitude': obj.latitude,
-            },
-            'postal_code': obj.zip,
-            'locality': obj.city,
-            'region': obj.state
-        }
-
-    def get_attribute(self, obj):
-        return obj
 
 class OsdiLocationGeoSerializer(serializers.ModelSerializer):
     class Meta:
@@ -51,7 +28,7 @@ class OsdiLocationSerializer(serializers.ModelSerializer):
     def get_attribute(self, obj):
         return obj
 
-
+# HalModelSerializer is failing with location (non)'nested' field
 class OsdiEventSerializer(serializers.ModelSerializer):
     class Meta:
         model = Event
@@ -102,7 +79,6 @@ class OsdiEventSerializer(serializers.ModelSerializer):
         """we are using this strictly as private/public, but is_searchable is different"""
         return obj.get_is_private_display()
     location = OsdiLocationSerializer(required=False)
-    #OsdiLocationSerializer(required=False) #OsdiLocationField()
 
     human_date = serializers.SerializerMethodField(read_only=True)
     def get_human_date(self, obj):
@@ -118,10 +94,11 @@ class OsdiEventSerializer(serializers.ModelSerializer):
         # Flatten the location fields into the same internal value
         if 'location' in internal:
             loc = internal.pop('location')
-            if 'location' in loc:
-                locloc = loc.pop('location')
-                loc.update(locloc)
-            internal.update(loc)
+            if loc:
+                if 'location' in loc:
+                    locloc = loc.pop('location')
+                    loc.update(locloc)
+                internal.update(loc)
         return internal
 
     @classmethod
