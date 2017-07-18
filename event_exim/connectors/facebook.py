@@ -174,7 +174,7 @@ class Connector:
             'organization_source_pk': facebook_event['id'],
             'organization': self.source.origin_organization,
             'organization_campaign': '', # maybe owner?
-            'is_searchable': is_private,
+            'is_searchable': not is_private,
             'private_phone': '',
             'phone': '',
             'url': url,
