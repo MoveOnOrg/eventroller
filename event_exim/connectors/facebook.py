@@ -214,7 +214,7 @@ class Connector:
     def _api_load(self, ids, ids_are_events=True,
                   since_str='', follow_next=None):
         """
-        Loads events from facebook api.
+        Load a list of events from facebook api.
         if `ids` are comma-separated events, then ids_are_events=True
         if `ids` are comma-separated pages, then ids_are_events=False
         """
@@ -238,7 +238,7 @@ class Connector:
         # so we homogenize the output to a single list
         # TODO: maybe the PAGE should be campaign or maybe page=owner?
         if ids_are_events:
-            return events.values()
+            return list(events.values())
         else:
             fb_events = []
             for page_id, result in events.items():
