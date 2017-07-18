@@ -17,22 +17,22 @@ def strip_tz(datetime):
 
 class Connector:
     """
-    
+
     """
 
     description = """
-1. Create a facebook app, then add Events capability to it -- you don't have to submit it.
-2. Get a long-lived user access token:
-    * Go to [Facebook's Graph API Explorer](https://developers.facebook.com/tools/explorer) and
-      make sure it is associated with your app (top right drop down).
-    * Under Get Token, choose Get User Access Token, ensuring `user_events` and `pages_show_list`
-      (and maybe `rsvp_event`) are both selected as permissions.
-    * Under Get Token > Page Access Tokens, chose your target Page.
-    * Click the little blue i to the left of the Token and note the expiration time. Choose Open in Access Token Tool.
-    * Click the blue Extend Access Token button at the bottom of the page. The Access Token toward the top of the page 
-should change.
-    * Click the "Debug" button to the right. "Expires" should show "Never"
-3. The Ad Account ID is a large integer displayed in several places in the business.facebook.com interface.
+[Updated 7/18/2017]
+1. Create a Facebook account.
+2. Go to [Facebook for Developers](developers.facebook.com). Click on the blue *Get Started* button in the top-right corner. Create a *New App ID*. Any name will do. We recommend `eventroller`.
+3. Get a long-lived user access token:
+    * Go to [Facebook's Graph API Explorer](https://developers.facebook.com/tools/explorer). Look for the top right dropdown. It should have a Label saying *Application*, and a value of *Graph API Explorer*. Click on the dropdown and change it it to your app.
+    * Under the *Get Token* dropdown, click on *Get User Access Token*. A modal should popup. There, select `user_events` and `pages_show_list` as permissions. Then click on *Get Access Token*. (Facebook may ask for additional permissions at this point. Click yes.)
+    * Under the *Get Token* dropdown, click on *Page Access Tokens*. (Don't accidently click on *Get App Token*. That will replace your User Access Token with an App Token. We want the Page Access Token to build on top of the User Access Token. If you lose the User Access Token, then repeat the previous step before proceeding with this one.)
+    * Click the little blue i left of the Token. A box should popup with token information. Note the expiration time, then click *Open in Access Token Tool*.
+    * Click the blue *Extend Access Token* button at the bottom of the page. A new Access Token should pop up at the bottom.
+    * Click the white "Debug" button to the right. "Expires" should show a date two months into the future.
+4. Create a `./local_settings.py` file in your root directory if you don't have one. Save this Access Token as an `auth_token` property on a facebook app. (See `local_settings.py.example` for a guide.)
+5. Go to your app dashboard from [All Apps - Facebook for Developers](developers.facebook.com/apps). Copy the *App ID* and *App Secret* into `app_id` and `app_secret` properties on a facebook app. (See `local_settings.py.example` for a guide.)
     """
 
     # See https://developers.facebook.com/docs/graph-api/reference/event/

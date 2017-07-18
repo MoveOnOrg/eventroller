@@ -1,3 +1,4 @@
+# [Updated 07/18/2017]
 EVENT_SOURCES = {
     'example.com': {
         'crm_type': 'actionkit_api',
@@ -7,6 +8,18 @@ EVENT_SOURCES = {
         'base_url': 'https://roboticdogs.actionkit.com',
         'ignore_host_ids': '123,345',
         'max_event_load': 100,
+    },
+    'facebook-example': {
+        'crm_type': 'facebook',
+        # Get app_id and app_secret from your app dashboard
+        # Go to developers.facebook.com/apps and click on your app to
+        # get there
+        'app_id': '0123456789',
+        'app_secret': 'abcdefghijklmnopqrstuvwxyz1234567890',
+        # insert Access Token from developers.facebook.com/tools/explorer
+        'auth_token': 'abcdefghijklmnopqrstuvwxyz1234567890',
+        'token_expiration': '2017-09-10',
+        'user_id': 'Your Name',
     },
 }
 
