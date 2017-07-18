@@ -18,9 +18,21 @@ from event_store.models import Event
 
 
 def refresh_event(request, eventsource_name, organization_source_pk):
+    """
+    Responds with a 'pixel'. The 'pixel' has no client-side meaning.
+
+    It exists so that the client has a URL to ping, and so that the
+    client can send headers and associated metadata to our servers.
+
+    Bytes are specified to avoid an empty response. Clients don't
+    handle blank responses very well.
+
+    Bytes taken from:
+    http://probablyprogramming.com/2009/03/15/the-tiniest-gif-ever
+    """
     eventsource = get_object_or_404(EventSource, name=eventsource_name)
     eventsource.update_event(organization_source_pk)
-    #http://probablyprogramming.com/2009/03/15/the-tiniest-gif-ever
+
     return HttpResponse(
         bytes([71,73,70,56,57,97,1,0,1,0,0,255,0,44,0,0,0,0,1,0,1,0,0,2,0,59]),
         content_type='image/gif')

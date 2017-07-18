@@ -71,7 +71,8 @@ class OsdiEventSerializer(serializers.ModelSerializer):
 
     # e.g. 2017-07-04T19:00:00
     start_date = serializers.DateTimeField(source='starts_at', format='iso-8601', required=False)
-    end_date = serializers.DateTimeField(source='ends_at', allow_null=True, format='iso-8601', required=False)
+    end_date = serializers.DateTimeField(source='ends_at', allow_null=True, format='iso-8601',
+                                         required=False)
 
     capacity = serializers.IntegerField(source="max_attendees", required=False)
     visibility = serializers.SerializerMethodField(required=False)
