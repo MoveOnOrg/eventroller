@@ -81,7 +81,7 @@ def long_field(longtext, heading=''):
     if not longtext:
         return ''
     return format_html(heading
-                       + '<div style="max-height: 7.9em; overflow-y: auto" class="well well-sm">{}</div>',
+                       + '<div style="max-height: 7.9em; max-width: 600px; overflow-y: auto" class="well well-sm">{}</div>',
                        longtext)
 
 def event_list_display(obj, onecol=False):
