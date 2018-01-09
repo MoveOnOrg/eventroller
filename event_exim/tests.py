@@ -35,4 +35,5 @@ class SmokeTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
 
     def test_api_content_type(self):
+        response = self.c.get('/api/v1/events/')
         self.assertEqual(response['content-type'], 'application/json')
