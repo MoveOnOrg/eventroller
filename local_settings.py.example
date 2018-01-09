@@ -1,4 +1,21 @@
-# [Updated 07/18/2017]
+"""
+`EVENT_SOURCES` is a dict that includes a list of event source parameters
+
+These parameters can be specified in the event_exim.models.EventSource crm_data field.
+However, configuring it in settings, means that the security credentials used to connect to
+those sources does not need to be stored in the database (nor exposed anywhere in the UI).
+
+EVENT_SOURCES keys should be the EventSource.name field for an existing record or one that
+will be auto-created.  Besides the parameters for the connector, include a key 'crm_type'
+which should correspond to one of the CRM_TYPES listed in event_exim.models
+
+## Auto-creation
+
+To setup event sources, many database records need to be created to setup an organization,
+a source (or multiple sources), and groups for users to be able to access the different
+parts of administration and event review.
+"""
+
 EVENT_SOURCES = {
     'example.com': {
         'crm_type': 'actionkit_api',
@@ -22,5 +39,8 @@ EVENT_SOURCES = {
         'user_id': 'Your Name',
     },
 }
+
+# EVENT_PUBLIC_API = False
+# EVENT_PUBLIC_API_REFRESH = False
 
 DEBUG = True

@@ -62,7 +62,7 @@ class Connector:
                      'updated_at']
 
     other_fields = ['ee.id', 'ee.creator_id', 'ee.campaign_id', 'ee.phone', 'ee.notes',
-                    'ec.title', 'signuppage.name', 'createpage.name',
+                    'ec.title', 'signuppage.name', 'createpage.name', 'cec.page_ptr_id',
                     'host.id', 'hostaction.id', 'hostaction2.action_ptr_id', 'hostcreateaction.action_ptr_id',
                     'u.id', 'u.first_name', 'u.last_name', 'u.email', 'loc.us_district', 'recentphone.value']
 
@@ -282,6 +282,7 @@ class Connector:
                                  # other random data to keep around
                                  'campaign_id': event_row[fi['ee.campaign_id']],
                                  'create_page': event_row[fi['createpage.name']],
+                                 'create_page_id': event_row[fi['cec.page_ptr_id']],
                                  'create_action_id': cohost_create_action,
                                  'hosts': hosts,
                              }),
@@ -334,6 +335,7 @@ class Connector:
                 'last_updated': datetime.datetime.utcnow().strftime(DATE_FMT)}
 
     def update_review(self, event, reviews, log_message):
+        ## TODO: if eventfield ids are in json_data, then don't do a get
         res = self.akapi.get_event(event.organization_source_pk)
         if 'res' in res:
             eventfield_list = res['res'].json().get('fields', {})
@@ -404,3 +406,10 @@ class Connector:
                             for h in additional_hosts])
                         + '</div>')
         return None
+
+    def send_events(self, events, force_create=False):
+        """
+        TODO: implement a way to update/create events
+        which will be used for syncing from other sources
+        """
+        pass
