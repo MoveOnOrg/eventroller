@@ -9,6 +9,25 @@ It definitely has a time, though may not have a place, if it's virtual.
  * `reviewer`: Admin interface and schemas to log reviews 
  * `event_exim`: Event exporter/importer -- traffic control and management for organziations
 
+## Getting Started
+### Installation
+- Install python3, pip3 and virtualenv
+- Run `virtualenv -p python3 venv` to set up your virtual environment
+- Run `pip install -r requirements.txt` to get all the initial requirements
+- Every time you start working on Eventroller run: `source venv/bin/activate` to boot up the virtual environment
+- Install spatilite (similar to sqlite but with added location functionality)
+    - ubuntu `apt-get install python-pyspatialite spatialite-bin`
+    - macOSX `brew install libspatialite`
+
+
+### Running the app
+#### The first time
+- Run `./manage.py migrate` to set up initial test database, auth, and admin interface.
+- Then `./manage.py createsuperuser` to create admin user of the website
+
+#### Every time
+- Run the server with  `./manage.py runserver`
+- Run the tests with `./manage.py test`
 
 ## Basic Workflow User Story (not yet implemented)
 
