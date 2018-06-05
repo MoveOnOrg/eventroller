@@ -1,6 +1,10 @@
 from setuptools import setup
 import textwrap
-from pip.req import parse_requirements
+try:
+    # officially wrong, but as an internal lib, do we care?
+    from pip._internal.req import parse_requirements
+except ImportError:
+    from pip.req import parse_requirements
 
 install_reqs = parse_requirements('requirements.txt', session='hack')
 reqs = [str(ir.req) for ir in install_reqs]
