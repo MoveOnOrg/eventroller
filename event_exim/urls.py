@@ -5,7 +5,7 @@ from event_exim import views
 
 # public API endpoint for developers to fetch data from
 public_patterns = [
-    url(r'^events/$', views.PublicEventViewSet.as_view({'get': 'list'}),
+    url(r'^events/?$', views.PublicEventViewSet.as_view({'get': 'list'}),
         name='osdi_public_events'),
 ]
 

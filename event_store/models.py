@@ -4,6 +4,7 @@ import re
 
 from django.db import models
 from django.contrib.auth.models import User, Group
+from django.contrib.gis.db.models import PointField
 
 class Organization(models.Model):
     title = models.CharField(max_length=765)
@@ -111,6 +112,9 @@ class Event(models.Model):
     country = models.CharField(max_length=765, null=True, blank=True)
     longitude = models.FloatField(null=True, blank=True)
     latitude = models.FloatField(null=True, blank=True)
+
+    point = PointField(null=True, blank=True) # geo(lng, lat)
+
     title = models.CharField(max_length=765)
 
     starts_at = models.DateTimeField(null=True, blank=True, db_index=True)
