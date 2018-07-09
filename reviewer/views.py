@@ -73,7 +73,8 @@ def save_review(request, organization, content_type, pk):
             org = ReviewGroup.org_groups(organization)
             ct = ContentType.objects.get_for_id(int(content_type))
             # make sure the object exists
-            obj = ct.get_object_for_this_type(pk=pk)
+            # ct.get_object_for_this_type fails to cross db boundaries
+            obj = ct.model_class().objects.get(pk=pk)
             decisions = [d[:257].split(':') for d in decisions_str.split(';')]
             # 1. save to database
             reviews = [Review.objects.create(content_type=ct, object_id=obj.id,
@@ -173,7 +174,8 @@ def get_review_history(request, organization):
             if dbreview:
                 objrev.update(dbreview[(int(content_type_id), int(pk))])
             else:
-                obj = ct.get_object_for_this_type(pk=pk)
+                # ct.get_object_for_this_type fails to cross db boundaries, so skip
+                obj = ct.model_class().objects.get(pk=pk)
                 objrev.update(getattr(obj, 'review_data', lambda: {})())
 
             obj_key = '{}_{}'.format(content_type_id, pk)

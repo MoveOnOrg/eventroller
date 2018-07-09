@@ -153,10 +153,7 @@ Reviewer.prototype = {
         decisions.push(name + ':' + reviewSubject.data[name]);
       }
     }
-    var csrfmiddlewaretoken = undefined;
-    if (document.forms[0] && document.forms[0]['csrfmiddlewaretoken']) {
-      csrfmiddlewaretoken = document.forms[0]['csrfmiddlewaretoken'].value;
-    }
+    var csrfmiddlewaretoken = $('input[name=csrfmiddlewaretoken]').val();
     this.$.ajax({
       'url': (opt.apiPath + ['', opt.organization, opt.contentType, reviewSubject.pk, ''].join('/')),
       'method': 'POST',
