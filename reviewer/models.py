@@ -72,7 +72,7 @@ class Review(models.Model):
         content_type = ContentType.objects.get_for_model(content_queryset.model)
         result = Review.objects.bulk_create([
             Review(organization=organization,
-                   reviewer=reviwer,
+                   reviewer=reviewer,
                    key=key,
                    decision=decision,
                    object_id=obj_id,

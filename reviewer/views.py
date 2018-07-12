@@ -77,8 +77,10 @@ def save_review(request, organization, content_type, pk):
             obj = ct.model_class().objects.get(pk=pk)
             decisions = [d[:257].split(':') for d in decisions_str.split(';')]
             # 1. save to database
-            # TODO: should only create review if it wasn't already set that way for
-            # the existing key
+            deleted_res = (Review.objects.filter(content_type=ct,
+                                                 object_id=obj.id,
+                                                 organization_id=org[0].organization_id)
+                           .delete())
             reviews = [Review.objects.create(content_type=ct, object_id=obj.id,
                                              organization_id=org[0].organization_id,
                                              reviewer=request.user,
