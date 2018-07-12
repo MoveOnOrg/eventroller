@@ -85,7 +85,8 @@ def save_review(request, organization, content_type, pk):
                                              organization_id=org[0].organization_id,
                                              reviewer=request.user,
                                              key=k, decision=decision)
-                       for k, decision in decisions]
+                       for k, decision in decisions
+                       if decision]
 
             if log_message:
                 ReviewLog.objects.create(content_type=ct,
