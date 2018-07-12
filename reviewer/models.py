@@ -65,6 +65,40 @@ class Review(models.Model):
     decision = models.CharField(max_length=128)
 
     @classmethod
+    def bulk_add_tag(cls, content_queryset, organization, reviewer, key, decision):
+        """
+        TODO: this may require more work when supporting multi-select
+        """
+        content_type = ContentType.objects.get_for_model(content_queryset.model)
+        result = Review.objects.bulk_create([
+            Review(organization=organization,
+                   reviewer=reviwer,
+                   key=key,
+                   decision=decision,
+                   object_id=obj_id,
+                   content_type=content_type)
+            for obj_id in content_queryset.values_list('id', flat=True)
+        ])
+        return result
+
+    @classmethod
+    def bulk_delete_tag(cls, content_queryset, organization, reviewer, key, decision):
+        """
+        TODO: this may require more work when supporting multi-select
+        """
+        content_type = ContentType.objects.get_for_model(content_queryset.model)
+        result = Review.objects.bulk_create([
+            Review(organization=organization,
+                   reviewer=reviwer,
+                   key=key,
+                   decision=decision,
+                   object_id=obj_id,
+                   content_type=content_type)
+            for obj_id in content_queryset.values_list('id', flat=True)
+        ])
+        return result
+
+    @classmethod
     def reviews_by_object(cls, queryset=None, max=0, **filterargs):
         if not queryset:
             queryset = cls.objects
