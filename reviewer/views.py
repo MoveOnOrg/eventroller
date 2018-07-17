@@ -133,11 +133,6 @@ def get_review_history(request, organization):
     cached_reviews = []
     if pk_keys:
         cached_reviews = redis.hmget(reviewskey, *pk_keys)
-    print("get review history")
-    print("reviewskey", reviewskey)
-    print("pk_keys", pk_keys) #debug
-    print(cached_reviews) #debug
-    # import pdb; pdb.set_trace()
     logs = []
     if getlogs:
         subjects = {}
