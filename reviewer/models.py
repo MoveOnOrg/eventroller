@@ -112,9 +112,7 @@ class Review(models.Model):
         obj_ids = ['{}_{}'.format(content_type_id, x.id) for x in content_queryset]
         if obj_ids:
             return redis.hdel(reviewskey, *obj_ids)
-        else:
-            return None
-
+        return None
 
     @classmethod
     def reviews_by_object(cls, queryset=None, max=0, **filterargs):
