@@ -69,6 +69,7 @@ class Review(models.Model):
     @classmethod
     def bulk_add_tag(cls, content_queryset, organization, reviewer, key, decision):
         """
+        Adds one tag at a time to selected object instances
         TODO: this may require more work when supporting multi-select
         """
         content_type = ContentType.objects.get_for_model(content_queryset.model)
@@ -104,7 +105,10 @@ class Review(models.Model):
 
     @classmethod
     def bulk_clear_review_cache(cls, content_queryset, organization):
-        #TODO: check that this method actually clears the targeted keys review caches
+        """
+        Clears cached reviews so we can update the display accurately
+        after bulk delete/add
+        """
         REDIS_CACHE_KEY = getattr(settings, 'REVIEWER_CACHE_KEY', 'default')
         redis = get_redis_connection(REDIS_CACHE_KEY)
         reviewskey = '{}_reviews'.format(organization.slug)
