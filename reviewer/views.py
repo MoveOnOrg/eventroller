@@ -126,13 +126,18 @@ def get_review_history(request, organization):
     reviewskey = '{}_reviews'.format(organization)
 
     content_type_id = int(request.GET.get('type'))
-    ct = ContentType.objects.get_for_id(content_type_id) # confirm existance
+    ct = ContentType.objects.get_for_id(content_type_id) # confirm existence
     pks = [pk for pk in request.GET.get('pks').split(',') if pk]
     getlogs = request.GET.get('logs')
     pk_keys = ['{}_{}'.format(content_type_id, pk) for pk in pks]
     cached_reviews = []
     if pk_keys:
         cached_reviews = redis.hmget(reviewskey, *pk_keys)
+    print("get review history")
+    print("reviewskey", reviewskey)
+    print("pk_keys", pk_keys) #debug
+    print(cached_reviews) #debug
+    # import pdb; pdb.set_trace()
     logs = []
     if getlogs:
         subjects = {}
@@ -164,8 +169,9 @@ def get_review_history(request, organization):
                              'ts': int(time.mktime(r['created_at'].timetuple()))
                          } for r in review_logs]})
     reviews = []
+
     for i,r in enumerate(cached_reviews):
-        if r is not None:
+        if r is not None: 
             reviews.append(r.decode('utf-8'))
         else: # no cached version yet
             pk = pks[i]
