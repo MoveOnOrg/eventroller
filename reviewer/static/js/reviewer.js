@@ -176,9 +176,22 @@ Reviewer.prototype = {
       if (callback) { callback(); }
     });
   },
-  deleteReview: function(e) {
+  deleteReview: function(e, reviewSubject, callback) {
     e.preventDefault();
+    const opt = this.opt;
     const reviewId = e.target.dataset.id;
+    const url = opt.apiPath + ['', opt.organization, opt.contentType, reviewSubject.pk, reviewId, ''].join('/');
+    var csrfmiddlewaretoken = $('input[name=csrfmiddlewaretoken]').val();
+
+    this.$.ajax({
+      url: url,
+      method: 'DELETE',
+      beforeSend: xhr => {
+        xhr.setRequestHeader('X-CSRFToken', csrfmiddlewaretoken);
+      },
+    }).then(() => {
+      if (callback) { callback(); }
+    })
   },
   pollState: function() {
     var self = this;
@@ -413,7 +426,11 @@ Reviewer.prototype = {
 
     // 2. Add event listener to each button and call the deleteReview function
     deleteButtons.forEach(button => {
-      button.addEventListener('click', self.deleteReview);
+      button.addEventListener('click', e => {
+        self.deleteReview(e, reviewSubject, () => {
+          self.renderLogUpdate(reviewSubject);
+        })
+      });
     })
   }
 };

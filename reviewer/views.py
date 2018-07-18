@@ -155,18 +155,20 @@ def get_review_history(request, organization):
                                                     'message',
                                                     'created_at',
                                                     'object_id',
+                                                    'id',
                                                 )
             logs.append({"pk": pk, 'type': content_type_id,
                          "m": [{
                              'r': '{} {}'.format(r['reviewer__first_name'],r['reviewer__last_name'][:1]),
                              'pk': r['object_id'], #for subject search broadening
                              'm': r['message'],
-                             'ts': int(time.mktime(r['created_at'].timetuple()))
+                             'ts': int(time.mktime(r['created_at'].timetuple())),
+                             'id': r['id'],
                          } for r in review_logs]})
     reviews = []
 
     for i,r in enumerate(cached_reviews):
-        if r is not None: 
+        if r is not None:
             reviews.append(r.decode('utf-8'))
         else: # no cached version yet
             pk = pks[i]
@@ -275,3 +277,11 @@ def current_review_state(request, organization):
         ','.join([o.decode('utf-8') for o in items]),
         ','.join([m.decode('utf-8') for m in focus])
     ), content_type='application/json')
+
+@reviewgroup_auth
+def delete_review(request, organization, content_type, pk, id):
+    if request.method == 'DELETE':
+        if request.user.has_perm('reviewer.delete_ReviewLog'):
+            reviewObj = ReviewLog.objects.get(id=id)
+            reviewObj.delete()
+            return HttpResponse("deleted")
