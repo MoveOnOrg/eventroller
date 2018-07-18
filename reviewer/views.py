@@ -89,7 +89,7 @@ def save_review(request, organization, content_type, pk):
                        if decision]
 
             if log_message:
-                ReviewLog.objects.create(content_type=ct,
+                newReviewLog = ReviewLog.objects.create(content_type=ct,
                                          object_id=obj.id,
                                          subject=int(subject) if subject else None,
                                          organization_id=org[0].organization_id,
@@ -109,7 +109,7 @@ def save_review(request, organization, content_type, pk):
             redis.hset(reviewskey, obj_key, json_str)
             redis.lpush(itemskey, json_str)
             redis.ltrim(itemskey, 0, QUEUE_SIZE)
-            return HttpResponse("ok")
+            return HttpResponse(newReviewLog.id)
     return HttpResponse("nope!")
 
 
