@@ -77,11 +77,16 @@ def save_review(request, organization, content_type, pk):
             obj = ct.model_class().objects.get(pk=pk)
             decisions = [d[:257].split(':') for d in decisions_str.split(';')]
             # 1. save to database
+            deleted_res = (Review.objects.filter(content_type=ct,
+                                                 object_id=obj.id,
+                                                 organization_id=org[0].organization_id)
+                           .delete())
             reviews = [Review.objects.create(content_type=ct, object_id=obj.id,
                                              organization_id=org[0].organization_id,
                                              reviewer=request.user,
                                              key=k, decision=decision)
-                       for k, decision in decisions]
+                       for k, decision in decisions
+                       if decision]
 
             if log_message:
                 ReviewLog.objects.create(content_type=ct,
@@ -121,7 +126,7 @@ def get_review_history(request, organization):
     reviewskey = '{}_reviews'.format(organization)
 
     content_type_id = int(request.GET.get('type'))
-    ct = ContentType.objects.get_for_id(content_type_id) # confirm existance
+    ct = ContentType.objects.get_for_id(content_type_id) # confirm existence
     pks = [pk for pk in request.GET.get('pks').split(',') if pk]
     getlogs = request.GET.get('logs')
     pk_keys = ['{}_{}'.format(content_type_id, pk) for pk in pks]
@@ -159,8 +164,9 @@ def get_review_history(request, organization):
                              'ts': int(time.mktime(r['created_at'].timetuple()))
                          } for r in review_logs]})
     reviews = []
+
     for i,r in enumerate(cached_reviews):
-        if r is not None:
+        if r is not None: 
             reviews.append(r.decode('utf-8'))
         else: # no cached version yet
             pk = pks[i]
