@@ -143,6 +143,10 @@ def event_list_display(obj, onecol=False):
 
 @admin.register(Event)
 class EventAdmin(admin.ModelAdmin):
+    def changelist_view(self, request, extra_context=None):
+        extra_context = {'title': 'Event admin tool'}
+        return super(EventAdmin, self).changelist_view(request, extra_context=extra_context)
+
     change_list_template = "admin/change_list_filters_top.html" #part of huerta
     filters_collapsable = True
     filters_require_submit = True
