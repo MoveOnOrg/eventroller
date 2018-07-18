@@ -165,13 +165,15 @@ Reviewer.prototype = {
         log: log,
         subject: reviewSubject.subject
       }
-    }).then(function() {
+    }).then(function(reviewLogId) {
       if (log) {
         if (!reviewSubject.log) { reviewSubject.log = []; }
         reviewSubject.log.unshift({"m":log,
                          "r":'<i>me</i>',
                          "pk": reviewSubject.pk,
-                         "ts":parseInt(Number(new Date())/1000)})
+                         "ts": parseInt(Number(new Date())/1000),
+                         "id": parseInt(reviewLogId),
+                       })
       }
       if (callback) { callback(); }
     });
@@ -179,7 +181,7 @@ Reviewer.prototype = {
   deleteReview: function(e, reviewSubject, callback) {
     e.preventDefault();
     const opt = this.opt;
-    const reviewId = e.target.dataset.id;
+    const reviewId = parseInt(e.target.dataset.id);
     const url = opt.apiPath + ['', opt.organization, opt.contentType, reviewSubject.pk, reviewId, ''].join('/');
     var csrfmiddlewaretoken = $('input[name=csrfmiddlewaretoken]').val();
 
@@ -190,7 +192,10 @@ Reviewer.prototype = {
         xhr.setRequestHeader('X-CSRFToken', csrfmiddlewaretoken);
       },
     }).then(() => {
-      if (callback) { callback(); }
+      reviewSubject.log = reviewSubject.log.filter(logObj => {
+        return logObj.id !== reviewId;
+      });
+      if (callback) { callback(reviewSubject); }
     })
   },
   pollState: function() {
@@ -326,7 +331,7 @@ Reviewer.prototype = {
               + '<span class="reviewer">' + log.r + '</span>'
               + ' (' + tsStr + '): '
               + '<span class="logm">' + log.m + '</span>'
-              + `<button class="btn btn-default btn-primary delete" data-id=${log.id}>Delete</button>`
+              + `<button class="btn btn-default btn-primary delete" data-id=${log.id} data-click=${false} >Delete</button>`
               + '</div>'
              );
     };
@@ -348,6 +353,7 @@ Reviewer.prototype = {
   },
   renderLogUpdate: function(reviewSubject) {
     this.$('.logs', reviewSubject.o).html(this.renderLog(reviewSubject));
+    this.addDeleteListeners(reviewSubject);
   },
   renderDecisions: function(schema, reviewSubject) {
     var prefix = this.prefix;
@@ -420,17 +426,21 @@ Reviewer.prototype = {
         });
       }
     });
-    // C. Delete reviews (notes)
+    self.addDeleteListeners(reviewSubject);
+  },
+  addDeleteListeners: function(reviewSubject) {
+    // Delete reviews (notes)
     // 1. Select all delete buttons
-    const deleteButtons = document.querySelectorAll('.delete');
+    const deleteButtons = document.querySelectorAll('button.delete');
 
     // 2. Add event listener to each button and call the deleteReview function
     deleteButtons.forEach(button => {
-      button.addEventListener('click', e => {
-        self.deleteReview(e, reviewSubject, () => {
-          self.renderLogUpdate(reviewSubject);
-        })
-      });
+      if (button.dataset.click === "false") {
+        button.dataset.click = true;
+        button.addEventListener('click', e => {
+          this.deleteReview(e, reviewSubject, this.renderLogUpdate);
+        });
+      }
     })
-  }
+  },
 };
