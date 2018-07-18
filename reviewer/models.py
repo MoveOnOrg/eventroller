@@ -100,11 +100,11 @@ class Review(models.Model):
             content_type=content_type,
             object_id__in=obj_ids
         ).delete()
-        cls.bulk_clear_review_cache(content_queryset, organization)
+        cls.bulk_clear_review_cache(obj_ids, content_type.id, organization)
         return result
 
     @classmethod
-    def bulk_clear_review_cache(cls, content_queryset, organization):
+    def bulk_clear_review_cache(cls, obj_ids, content_type_id, organization):
         """
         Clears cached reviews so we can update the display accurately
         after bulk delete/add
@@ -112,10 +112,9 @@ class Review(models.Model):
         REDIS_CACHE_KEY = getattr(settings, 'REVIEWER_CACHE_KEY', 'default')
         redis = get_redis_connection(REDIS_CACHE_KEY)
         reviewskey = '{}_reviews'.format(organization.slug)
-        content_type_id = ContentType.objects.get_for_model(content_queryset.model).id
-        obj_ids = ['{}_{}'.format(content_type_id, x.id) for x in content_queryset]
-        if obj_ids:
-            return redis.hdel(reviewskey, *obj_ids)
+        obj_keys = ['{}_{}'.format(content_type_id, x) for x in obj_ids]
+        if obj_keys:
+            return redis.hdel(reviewskey, *obj_keys)
         return None
 
     @classmethod
