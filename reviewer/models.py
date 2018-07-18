@@ -3,10 +3,12 @@ from __future__ import unicode_literals
 from collections import OrderedDict
 
 from django.db import models
+from django.conf import settings
 
 from django.contrib.auth.models import User, Group
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.contenttypes.fields import GenericForeignKey
+from django_redis import get_redis_connection
 
 from event_store.models import Organization
 
@@ -65,6 +67,57 @@ class Review(models.Model):
     decision = models.CharField(max_length=128)
 
     @classmethod
+    def bulk_add_tag(cls, content_queryset, organization, reviewer, key, decision):
+        """
+        Adds one tag at a time to selected object instances
+        TODO: this may require more work when supporting multi-select
+        """
+        content_type = ContentType.objects.get_for_model(content_queryset.model)
+        result = Review.objects.bulk_create([
+            Review(organization=organization,
+                   reviewer=reviewer,
+                   key=key,
+                   decision=decision,
+                   object_id=obj_id,
+                   content_type=content_type)
+            for obj_id in content_queryset.values_list('id', flat=True)
+        ])
+        cls.bulk_clear_review_cache(content_queryset, organization)
+        return result
+
+    @classmethod
+    def bulk_delete_tag(cls, content_queryset, organization, reviewer, key):
+        """
+        Deletes one tag at a time from selected object instances
+        TODO: this may require more work when supporting multi-select
+        """
+        content_type = ContentType.objects.get_for_model(content_queryset.model)
+        obj_ids = [x.id for x in content_queryset]
+        result = Review.objects.filter(
+            organization=organization,
+            reviewer=reviewer,
+            key=key,
+            content_type=content_type,
+            object_id__in=obj_ids
+        ).delete()
+        cls.bulk_clear_review_cache(obj_ids, content_type.id, organization)
+        return result
+
+    @classmethod
+    def bulk_clear_review_cache(cls, obj_ids, content_type_id, organization):
+        """
+        Clears cached reviews so we can update the display accurately
+        after bulk delete/add
+        """
+        REDIS_CACHE_KEY = getattr(settings, 'REVIEWER_CACHE_KEY', 'default')
+        redis = get_redis_connection(REDIS_CACHE_KEY)
+        reviewskey = '{}_reviews'.format(organization.slug)
+        obj_keys = ['{}_{}'.format(content_type_id, x) for x in obj_ids]
+        if obj_keys:
+            return redis.hdel(reviewskey, *obj_keys)
+        return None
+
+    @classmethod
     def reviews_by_object(cls, queryset=None, max=0, **filterargs):
         if not queryset:
             queryset = cls.objects
@@ -84,7 +137,7 @@ class Review(models.Model):
             if key not in already:
                 db_res.append(r)
                 already.add(key)
-                if len(db_res) > max:
+                if max and len(db_res) > max:
                     break
         if db_res:
             revs = OrderedDict()
