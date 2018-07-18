@@ -176,6 +176,10 @@ Reviewer.prototype = {
       if (callback) { callback(); }
     });
   },
+  deleteReview: function(e) {
+    e.preventDefault();
+    const reviewId = e.target.dataset.id;
+  },
   pollState: function() {
     var self = this;
     var opt = this.opt;
@@ -309,11 +313,13 @@ Reviewer.prototype = {
               + '<span class="reviewer">' + log.r + '</span>'
               + ' (' + tsStr + '): '
               + '<span class="logm">' + log.m + '</span>'
+              + `<button class="btn btn-default btn-primary delete" data-id=${log.id}>Delete</button>`
               + '</div>'
              );
     };
     var eventNotes = '';
     var hostNotes = '';
+
     reviewSubject.log.map(function(log) {
       if (isHostLog(log)) {
         hostNotes = hostNotes + renderLogHtml(log);
@@ -401,5 +407,13 @@ Reviewer.prototype = {
         });
       }
     });
+    // C. Delete reviews (notes)
+    // 1. Select all delete buttons
+    const deleteButtons = document.querySelectorAll('.delete');
+
+    // 2. Add event listener to each button and call the deleteReview function
+    deleteButtons.forEach(button => {
+      button.addEventListener('click', self.deleteReview);
+    })
   }
 };
