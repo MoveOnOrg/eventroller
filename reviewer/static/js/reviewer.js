@@ -331,7 +331,7 @@ Reviewer.prototype = {
               + '<span class="reviewer">' + log.r + '</span>'
               + ' (' + tsStr + '): '
               + '<span class="logm">' + log.m + '</span>'
-              + `<button class="btn btn-default btn-primary delete" data-id=${log.id} data-click=${false} >Delete</button>`
+              + `<button class="btn btn-danger delete" data-id=${log.id} data-click="false"><span class="glyphicon glyphicon-trash"></span></button>`
               + '</div>'
              );
     };

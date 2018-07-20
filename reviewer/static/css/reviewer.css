@@ -1,0 +1,18 @@
+button.delete {
+  padding: 0 4px;
+  margin-left: auto;
+}
+
+div.logitem {
+  display: flex;
+  background-color: white;
+  margin: 10px;
+  padding: 15px 10px;
+  align-items: center;
+  border-radius: 3px;
+  box-shadow: 0 2px 2px 1px rgba(0, 0, 0, 0.05);
+}
+
+span.glyphicon-trash {
+  font-size: 14px;
+}
