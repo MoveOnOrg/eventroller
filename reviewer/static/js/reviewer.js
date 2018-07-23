@@ -181,7 +181,7 @@ Reviewer.prototype = {
   deleteReview: function(e, reviewSubject, callback) {
     e.preventDefault();
     const opt = this.opt;
-    const reviewId = parseInt(e.target.dataset.id);
+    const reviewId = parseInt(e.target.parentElement.dataset.id);
     const url = opt.apiPath + ['', opt.organization, opt.contentType, reviewSubject.pk, reviewId, ''].join('/');
     var csrfmiddlewaretoken = $('input[name=csrfmiddlewaretoken]').val();
 
@@ -300,7 +300,7 @@ Reviewer.prototype = {
             + '  </div>'
             + ' </div>'
             + ' <b>Notes:</b>'
-            + ' <div class="logs well well-sm" aria-labelledby="Notes" style="max-height:7em;overflow-y:scroll">'
+            + ' <div class="logs well well-sm" aria-labelledby="Notes">'
             +      this.renderLog(reviewSubject)
             + ' </div>'
             + '</div>'
