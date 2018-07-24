@@ -179,7 +179,6 @@ Reviewer.prototype = {
     });
   },
   deleteReviewPermanently: function(e, reviewSubject) {
-    e.preventDefault();
     const opt = this.opt;
     const reviewId = parseInt(e.target.parentElement.dataset.id);
     const url = opt.apiPath + ['', opt.organization, opt.contentType, reviewSubject.pk, reviewId, ''].join('/');
@@ -198,11 +197,13 @@ Reviewer.prototype = {
       });
       this.renderLogUpdate(reviewSubject);
     })
-    this.renderDeleteUndoAlert(reviewSubject, true);
   },
   deleteReviewTemporarily: function(e, reviewSubject) {
     e.preventDefault();
-    this.renderDeleteUndoAlert(reviewSubject, true)
+    let deleteTimeout = setTimeout(() => {
+      this.deleteReviewPermanently(e, reviewSubject)
+    }, 7000)
+    this.renderDeleteUndoAlert(reviewSubject, deleteTimeout, true)
   },
   pollState: function() {
     var self = this;
@@ -315,27 +316,28 @@ Reviewer.prototype = {
   renderSaveUpdate: function(reviewSubject) {
     this.$('.saved', reviewSubject.o).html('saved!').show().fadeOut(2000);
   },
-  renderDeleteUndoAlert: function(reviewSubject, undo) {
+  renderDeleteUndoAlert: function(reviewSubject, timeout, undo) {
+    let undoAlertDiv = document.querySelector('div.undo-delete');
     const message = undo ?
-      'Note deleted. &emsp;<a class="alert-link undo-delete" href="javascript:;">Undo</a>' :
+      'Note deleted. &emsp;<a class="alert-link undo-delete" href="javascript:;" data-click="false">Undo</a>' :
       'Note undeleted.';
+    undoAlertDiv.innerHTML =
+      '<button type="button" class="close" data-dismiss="alert">&times;</button>'
+      + message;
+    undoAlertDiv.classList.add("alert", "alert-info");
 
-    let undoAlertHTML = document.createElement('div');
-    undoAlertHTML.classList.add("alert", "alert-info", "undo-delete")
-    undoAlertHTML.innerHTML = '<button type="button" class="close" data-dismiss="alert">&times;</button>'
-    + message
+    const fadeTime = undo ? 7000 : 4000;
 
-    const fadeTime = undo ? 7000 : 2000;
-
-    this.$('p.paginator').append(undoAlertHTML);
     this.$('div.undo-delete').stop(false, true);
-    this.$('div.undo-delete').fadeOut(7000, 'swing')
-    setTimeout(() => )
+    this.$('div.undo-delete').show().fadeOut(fadeTime, 'swing')
+    let undoLink = document.querySelector('a.undo-delete');
 
     if (undo) {
-      document.querySelector('a.undo-delete').onclick = () => this.renderDeleteUndoAlert(false);
+        undoLink.addEventListener('click', () => {
+          this.renderDeleteUndoAlert(reviewSubject, timeout, false)
+        });
     } else {
-      this.
+      clearTimeout(timeout);
     }
   },
   renderLog: function(reviewSubject) {
@@ -456,6 +458,12 @@ Reviewer.prototype = {
       }
     });
     self.addDeleteListeners(reviewSubject);
+
+    // 4 Add a placeholder div for the delete undo alerts
+    let undoAlertHTML = document.createElement('div');
+    undoAlertHTML.classList.add("undo-delete")
+    this.$('p.paginator').append(undoAlertHTML);
+
   },
   addDeleteListeners: function(reviewSubject) {
     // Delete reviews (notes)
@@ -467,7 +475,7 @@ Reviewer.prototype = {
       if (button.dataset.click === "false") {
         button.dataset.click = true;
         button.addEventListener('click', e => {
-          this.deleteReviewPermanently(e, reviewSubject);
+          this.deleteReviewTemporarily(e, reviewSubject);
         });
       }
     })
