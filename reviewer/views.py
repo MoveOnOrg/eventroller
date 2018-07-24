@@ -79,14 +79,15 @@ def save_review(request, organization, content_type, pk):
             # 1. save to database
             deleted_res = (Review.objects.filter(content_type=ct,
                                                  object_id=obj.id,
+                                                 key__in=[k for k, d in decisions],
                                                  organization_id=org[0].organization_id)
-                           .delete())
+                           .update(is_current=False))
             reviews = [Review.objects.create(content_type=ct, object_id=obj.id,
                                              organization_id=org[0].organization_id,
                                              reviewer=request.user,
-                                             key=k, decision=decision)
-                       for k, decision in decisions
-                       if decision]
+                                             key=k, decision=decision,
+                                             is_current=True)
+                       for k, decision in decisions]
 
             if log_message:
                 ReviewLog.objects.create(content_type=ct,
