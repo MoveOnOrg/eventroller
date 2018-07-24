@@ -178,13 +178,14 @@ Reviewer.prototype = {
       if (callback) { callback(); }
     });
   },
-  deleteReview: function(e, reviewSubject, callback) {
+  deleteReviewPermanently: function(e, reviewSubject) {
     e.preventDefault();
     const opt = this.opt;
     const reviewId = parseInt(e.target.parentElement.dataset.id);
     const url = opt.apiPath + ['', opt.organization, opt.contentType, reviewSubject.pk, reviewId, ''].join('/');
     var csrfmiddlewaretoken = $('input[name=csrfmiddlewaretoken]').val();
 
+    // alert("Confirm deletion");
     this.$.ajax({
       url: url,
       method: 'DELETE',
@@ -195,8 +196,13 @@ Reviewer.prototype = {
       reviewSubject.log = reviewSubject.log.filter(logObj => {
         return logObj.id !== reviewId;
       });
-      if (callback) { callback(reviewSubject); }
+      this.renderLogUpdate(reviewSubject);
     })
+    this.renderDeleteUndoAlert(reviewSubject, true);
+  },
+  deleteReviewTemporarily: function(e, reviewSubject) {
+    e.preventDefault();
+    this.renderDeleteUndoAlert(reviewSubject, true)
   },
   pollState: function() {
     var self = this;
@@ -308,6 +314,29 @@ Reviewer.prototype = {
   },
   renderSaveUpdate: function(reviewSubject) {
     this.$('.saved', reviewSubject.o).html('saved!').show().fadeOut(2000);
+  },
+  renderDeleteUndoAlert: function(reviewSubject, undo) {
+    const message = undo ?
+      'Note deleted. &emsp;<a class="alert-link undo-delete" href="javascript:;">Undo</a>' :
+      'Note undeleted.';
+
+    let undoAlertHTML = document.createElement('div');
+    undoAlertHTML.classList.add("alert", "alert-info", "undo-delete")
+    undoAlertHTML.innerHTML = '<button type="button" class="close" data-dismiss="alert">&times;</button>'
+    + message
+
+    const fadeTime = undo ? 7000 : 2000;
+
+    this.$('p.paginator').append(undoAlertHTML);
+    this.$('div.undo-delete').stop(false, true);
+    this.$('div.undo-delete').fadeOut(7000, 'swing')
+    setTimeout(() => )
+
+    if (undo) {
+      document.querySelector('a.undo-delete').onclick = () => this.renderDeleteUndoAlert(false);
+    } else {
+      this.
+    }
   },
   renderLog: function(reviewSubject) {
     if (!reviewSubject.log || !reviewSubject.log.length) {
@@ -438,7 +467,7 @@ Reviewer.prototype = {
       if (button.dataset.click === "false") {
         button.dataset.click = true;
         button.addEventListener('click', e => {
-          this.deleteReview(e, reviewSubject, this.renderLogUpdate);
+          this.deleteReviewPermanently(e, reviewSubject);
         });
       }
     })
