@@ -68,6 +68,7 @@ def save_review(request, organization, content_type, pk):
         decisions_str = request.POST.get('decisions', '')
         log_message = request.POST.get('log')
         subject = request.POST.get('subject')
+        # Saving notes will fail if there are no tags in the application
         if content_type and pk and len(decisions_str) >= 3\
            and ':' in decisions_str:
             org = ReviewGroup.org_groups(organization)
@@ -281,7 +282,6 @@ def current_review_state(request, organization):
 @reviewgroup_auth
 def delete_review(request, organization, content_type, pk, id):
     if request.method == 'DELETE':
-        if request.user.has_perm('reviewer.delete_ReviewLog'):
-            reviewObj = ReviewLog.objects.get(id=id)
-            reviewObj.delete()
+        if request.user.has_perm('reviewer.delete_reviewlog'):
+            ReviewLog.objects.get(id=id).delete()
             return HttpResponse("deleted")
