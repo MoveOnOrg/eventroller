@@ -168,13 +168,13 @@ Reviewer.prototype = {
     }).then(function(data) {
       if (log) {
         if (!reviewSubject.log) { reviewSubject.log = []; }
-        reviewSubject.log.unshift({"m":log,
-                         "r":'<i>me</i>',
-                         "pk": reviewSubject.pk,
-                         "ts": parseInt(Number(new Date())/1000),
-                         "id": parseInt(data.id),
-                         "canDelete": data.canDelete
-                       })
+        reviewSubject.log.unshift({'m':log,
+          'r':'<i>me</i>',
+          'pk': reviewSubject.pk,
+          'ts': parseInt(Number(new Date())/1000),
+          'id': parseInt(data.id),
+          'canDelete': data.canDelete
+        });
       }
       if (callback) { callback(); }
     });
@@ -182,7 +182,7 @@ Reviewer.prototype = {
   deleteReviewPermanently: function(reviewId, deletedReview) {
     const opt = this.opt;
     const url = opt.apiPath + ['', opt.organization, opt.contentType, deletedReview.pk, reviewId, ''].join('/');
-    var csrfmiddlewaretoken = $('input[name=csrfmiddlewaretoken]').val();
+    var csrfmiddlewaretoken = this.$('input[name=csrfmiddlewaretoken]').val();
 
     // alert("Confirm deletion");
     this.$.ajax({
@@ -191,12 +191,7 @@ Reviewer.prototype = {
       beforeSend: xhr => {
         xhr.setRequestHeader('X-CSRFToken', csrfmiddlewaretoken);
       },
-    }).then(() => {
-      // reviewSubject.log = reviewSubject.log.filter(logObj => {
-      //   return logObj.id !== reviewId;
-      // });
-      // this.renderLogUpdate(reviewSubject);
-    })
+    });
   },
   deleteReviewTemporarily: function(e, reviewSubject) {
     e.preventDefault();
@@ -204,15 +199,21 @@ Reviewer.prototype = {
 
     let deletedReview;
     reviewSubject.log = reviewSubject.log.filter(logObj => {
-      if (logObj.id === reviewId) { deletedReview = logObj };
+      if (logObj.id === reviewId) { deletedReview = logObj; }
       return logObj.id !== reviewId;
     });
     this.renderLogUpdate(reviewSubject);
 
     let deleteTimeout = setTimeout(() => {
-      this.deleteReviewPermanently(reviewId, deletedReview)
-    }, 7000)
-    this.renderDeleteUndoAlert(reviewSubject, deleteTimeout, deletedReview, true)
+      this.deleteReviewPermanently(reviewId, deletedReview);
+    }, 7000);
+    this.renderDeleteUndoAlert(reviewSubject, deleteTimeout, deletedReview, true);
+  },
+  handleUndelete: function(reviewSubject, reviewObject) {
+    reviewSubject.log.unshift(reviewObject);
+    if (reviewSubject.log[1].id > reviewObject.id) {
+      reviewSubject.log = reviewSubject.log.sort((a, b) => ( b.id - a.id ));
+    }
   },
   pollState: function() {
     var self = this;
@@ -333,21 +334,21 @@ Reviewer.prototype = {
     undoAlertDiv.innerHTML =
       '<button type="button" class="close" data-dismiss="alert">&times;</button>'
       + message;
-    undoAlertDiv.classList.add("alert", "alert-info");
+    undoAlertDiv.classList.add('alert', 'alert-info');
 
     const fadeTime = undo ? 7000 : 4000;
 
     this.$('div.undo-delete').stop(false, true);
-    this.$('div.undo-delete').show().fadeOut(fadeTime, 'swing')
+    this.$('div.undo-delete').show().fadeOut(fadeTime, 'swing');
     let undoLink = document.querySelector('a.undo-delete');
 
     if (undo) {
-        undoLink.addEventListener('click', () => {
-          this.renderDeleteUndoAlert(reviewSubject, timeout, reviewObject, false)
-        });
+      undoLink.addEventListener('click', () => {
+        this.renderDeleteUndoAlert(reviewSubject, timeout, reviewObject, false);
+      });
     } else {
       clearTimeout(timeout);
-      reviewSubject.log.unshift(reviewObject);
+      this.handleUndelete(reviewSubject, reviewObject);
       this.renderLogUpdate(reviewSubject);
     }
   },
@@ -357,7 +358,7 @@ Reviewer.prototype = {
     }
     var isHostLog = function(log) {
       return (reviewSubject.pk != log.pk);
-    }
+    };
     var renderLogHtml = function(log) {
       var d = new Date(log.ts * 1000);
       var dateStr = d.toLocaleDateString();
@@ -378,7 +379,7 @@ Reviewer.prototype = {
               // + canDelete ? deleteButton : ''
               + `${log.canDelete ? deleteButton : ''}`
               + '</div>'
-             );
+      );
     };
     var eventNotes = '';
     var hostNotes = '';
@@ -393,7 +394,7 @@ Reviewer.prototype = {
     if (hostNotes) {
       eventNotes = eventNotes + '<div><b>Host Notes (from past events)</b></div>' + hostNotes;
     }
-    return eventNotes
+    return eventNotes;
 
   },
   renderLogUpdate: function(reviewSubject) {
@@ -412,7 +413,7 @@ Reviewer.prototype = {
             + '</select></div>');
   },
   renderDecisionsUpdate: function(reviewSubject) {
-    if (!reviewSubject.o) { throw "cannot call renderUpdate unless we have a dom object"; }
+    if (!reviewSubject.o) { throw 'cannot call renderUpdate unless we have a dom object'; }
     var $ = this.$;
     this.opt.schema.map(function(schema) {
       var val = reviewSubject.data[schema.name];
@@ -426,7 +427,7 @@ Reviewer.prototype = {
       return '';
     }
     return reviewSubject.focus.map(function(reviewer) {
-      return '<span class="label label-info">'+reviewer+'</span>'
+      return '<span class="label label-info">'+reviewer+'</span>';
     }).join('');
   },
   renderFocusUpdate: function(reviewSubject) {
@@ -476,7 +477,7 @@ Reviewer.prototype = {
 
     // 4 Add a placeholder div for the delete undo alerts
     let undoAlertHTML = document.createElement('div');
-    undoAlertHTML.classList.add("undo-delete")
+    undoAlertHTML.classList.add('undo-delete');
     this.$('p.paginator').append(undoAlertHTML);
 
   },
@@ -487,12 +488,12 @@ Reviewer.prototype = {
 
     // 2. Add event listener to each button and call the deleteReview function
     deleteButtons.forEach(button => {
-      if (button.dataset.click === "false") {
+      if (button.dataset.click === 'false') {
         button.dataset.click = true;
         button.addEventListener('click', e => {
           this.deleteReviewTemporarily(e, reviewSubject);
         });
       }
-    })
+    });
   },
 };
