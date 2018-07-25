@@ -165,14 +165,15 @@ Reviewer.prototype = {
         log: log,
         subject: reviewSubject.subject
       }
-    }).then(function(reviewLogId) {
+    }).then(function(data) {
       if (log) {
         if (!reviewSubject.log) { reviewSubject.log = []; }
         reviewSubject.log.unshift({"m":log,
                          "r":'<i>me</i>',
                          "pk": reviewSubject.pk,
                          "ts": parseInt(Number(new Date())/1000),
-                         "id": parseInt(reviewLogId),
+                         "id": parseInt(data.id),
+                         "canDelete": data.canDelete
                        })
       }
       if (callback) { callback(); }
@@ -289,17 +290,13 @@ Reviewer.prototype = {
     for (var i=0,l=pks.length; i<l; i++) {
       var reviewSubject = this.state[pks[i]];
       if (reviewSubject.o && reviewSubject.data) {
-        const opt = this.opt
-        this.$.getJSON(this.opt.apiPath + '/delete_auth/' + opt.organization + '/')
-          .then(canDelete => {
-              reviewSubject.o.innerHTML = this.render(reviewSubject, canDelete);
-              this.postRender(reviewSubject);
-          });
+        reviewSubject.o.innerHTML = this.render(reviewSubject);
+        this.postRender(reviewSubject);
       }
     }
   },
   //from scratch
-  render: function(reviewSubject, canDelete) {
+  render: function(reviewSubject) {
     var self = this;
     return (''
             + '<div class="review-widget">'
@@ -320,7 +317,7 @@ Reviewer.prototype = {
             + ' </div>'
             + ' <b>Notes:</b>'
             + ' <div class="logs well well-sm" aria-labelledby="Notes">'
-            +      this.renderLog(reviewSubject, canDelete)
+            +      this.renderLog(reviewSubject)
             + ' </div>'
             + '</div>'
            )
@@ -354,7 +351,7 @@ Reviewer.prototype = {
       this.renderLogUpdate(reviewSubject);
     }
   },
-  renderLog: function(reviewSubject, canDelete) {
+  renderLog: function(reviewSubject) {
     if (!reviewSubject.log || !reviewSubject.log.length) {
       return '';
     }
@@ -379,7 +376,7 @@ Reviewer.prototype = {
               + ' (' + tsStr + '): '
               + '<span class="logm">' + log.m + '</span>'
               // + canDelete ? deleteButton : ''
-              + `${canDelete ? deleteButton : ''}`
+              + `${log.canDelete ? deleteButton : ''}`
               + '</div>'
              );
     };
@@ -497,22 +494,5 @@ Reviewer.prototype = {
         });
       }
     })
-  },
-  addDeleteButtons: function() {
-
-    const deleteButton = document.createElement('button');
-    deleteButton.classList.add("btn", "btn-danger", "delete");
-  },
-  handleDelete: function(reviewSubject) {
-    let ableToDelete
-    const opt = this.opt
-
-    this.$.getJSON(this.opt.apiPath + '/delete_auth/' + opt.organization + '/')
-      .then(data => {
-        ableToDelete = data;
-        if (ableToDelete) {
-          console.log("hello")
-        }
-      });
   },
 };

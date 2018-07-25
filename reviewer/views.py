@@ -5,7 +5,7 @@ import time
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Q
-from django.http import HttpResponse, HttpResponseForbidden, Http404
+from django.http import HttpResponse, HttpResponseForbidden, Http404, JsonResponse
 from django.shortcuts import render, get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
 
@@ -37,6 +37,7 @@ FOCUS_MAX = getattr(settings, 'REVIEWER_FOCUS_MAX', 30)
 # queue_size should probably be less than focus_max
 QUEUE_SIZE = getattr(settings, 'REVIEWER_QUEUE_SIZE', 12)
 
+
 def reviewgroup_auth(view_func):
     """
     Confirms that user is in a ReviewGroup of the appropriate organization.
@@ -52,9 +53,11 @@ def reviewgroup_auth(view_func):
         return view_func(request, organization, *args, **kw)
     return wrapped
 
+
 @reviewgroup_auth
 def base(request):
     return HttpResponse("ok")
+
 
 @reviewgroup_auth
 def save_review(request, organization, content_type, pk):
@@ -68,6 +71,10 @@ def save_review(request, organization, content_type, pk):
         decisions_str = request.POST.get('decisions', '')
         log_message = request.POST.get('log')
         subject = request.POST.get('subject')
+
+        # Check for user delete permissions to include in log}
+        canDelete = request.user.has_perm('reviewer.delete_reviewlog')
+
         # Saving notes will fail if there are no tags in the application
         if content_type and pk and len(decisions_str) >= 3\
            and ':' in decisions_str:
@@ -110,7 +117,7 @@ def save_review(request, organization, content_type, pk):
             redis.hset(reviewskey, obj_key, json_str)
             redis.lpush(itemskey, json_str)
             redis.ltrim(itemskey, 0, QUEUE_SIZE)
-            return HttpResponse(newReviewLog.id)
+            return JsonResponse({'id': newReviewLog.id, 'canDelete': canDelete})
     return HttpResponse("nope!")
 
 
@@ -125,6 +132,9 @@ def get_review_history(request, organization):
     """
     redis = get_redis_connection(REDIS_CACHE_KEY)
     reviewskey = '{}_reviews'.format(organization)
+
+    # Check for user delete permissions to include in log
+    canDelete = request.user.has_perm('reviewer.delete_reviewlog')
 
     content_type_id = int(request.GET.get('type'))
     ct = ContentType.objects.get_for_id(content_type_id) # confirm existence
@@ -165,6 +175,7 @@ def get_review_history(request, organization):
                              'm': r['message'],
                              'ts': int(time.mktime(r['created_at'].timetuple())),
                              'id': r['id'],
+                             'canDelete': canDelete,
                          } for r in review_logs]})
     reviews = []
 
@@ -194,6 +205,7 @@ def get_review_history(request, organization):
     return HttpResponse(
         """{"reviews":[%s],"logs":%s}""" % (','.join(reviews), json.dumps(logs)),
         content_type='application/json')
+
 
 @csrf_exempt
 @reviewgroup_auth
@@ -278,6 +290,7 @@ def current_review_state(request, organization):
         ','.join([o.decode('utf-8') for o in items]),
         ','.join([m.decode('utf-8') for m in focus])
     ), content_type='application/json')
+
 
 @reviewgroup_auth
 def delete_review(request, organization, content_type, pk, id):
