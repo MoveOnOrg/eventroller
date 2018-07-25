@@ -58,7 +58,7 @@ class ReviewerOrganizationFilter(SimpleListFilter):
     def lookups(self, request, model_admin):
         # we need this to save the right content type with the review api
         self.content_type = ContentType.objects.get_for_model(model_admin.model)
-        user = request.user
+        self.user = request.user
         return list(set(ReviewGroup.user_review_groups(request.user)
                         .exclude(organization__slug__endswith='hidden')
                         .values_list('organization_id', 'organization__title')))

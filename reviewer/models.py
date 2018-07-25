@@ -1,6 +1,7 @@
 from __future__ import unicode_literals
 
 from collections import OrderedDict
+import datetime
 
 from django.db import models
 from django.conf import settings
@@ -27,6 +28,12 @@ class ReviewGroup(models.Model):
     """
     organization = models.ForeignKey(Organization, db_index=True)
     group = models.ForeignKey(Group, db_index=True)
+    visibility_level = models.IntegerField(
+        default=0,
+        help_text=("Think of it like an access hierarchy. "
+                   "0 is generally the lowest level. "
+                   "Anything higher is probably staff/etc. "
+                   "It affects what Reviews and Notes will be visible"))
 
     class Meta:
         unique_together = ('organization', 'group')
@@ -40,6 +47,16 @@ class ReviewGroup(models.Model):
             _ORGANIZATIONS[organization_slug] = list(ReviewGroup.objects.filter(
                 organization__slug=organization_slug))
         return _ORGANIZATIONS.get(organization_slug)
+
+    @classmethod
+    def user_org_visibility(cls, organization_slug, user):
+        org_groups = cls.org_groups(organization_slug)
+        group_ids = set(user.groups.values_list('id', flat=True))
+        visibility = None
+        for org_grp in org_groups:
+            if org_grp.group_id in group_ids:
+                visibility = max(visibility, org_grp.visibility_level)
+        return visibility
 
     @classmethod
     def user_review_groups(cls, user):
@@ -57,6 +74,7 @@ class Review(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
     modified_at = models.DateTimeField(auto_now=True)
+    obsoleted_at = models.DateTimeField(null=True, blank=True)
 
     organization = models.ForeignKey(Organization)
     reviewer = models.ForeignKey(User)
@@ -65,7 +83,7 @@ class Review(models.Model):
                                       " -- this allows multiple keys per-object"),
                            default="review")
     decision = models.CharField(max_length=128)
-    is_current = models.BooleanField(default=True)
+    visibility_level = models.IntegerField()
 
     @classmethod
     def bulk_add_tag(cls, content_queryset, organization, reviewer, key, decision):
@@ -100,7 +118,7 @@ class Review(models.Model):
             key=key,
             content_type=content_type,
             object_id__in=obj_ids
-        ).update(is_current=False)
+        ).update(obsoleted_at=datetime.datetime.now())
         cls.bulk_clear_review_cache(obj_ids, content_type.id, organization)
         return result
 
@@ -123,7 +141,7 @@ class Review(models.Model):
         if not queryset:
             queryset = cls.objects
         if filterargs:
-            queryset = queryset.filter(is_current=True).filter(**filterargs)
+            queryset = queryset.filter(obsoleted_at=None).filter(**filterargs)
         query = queryset.order_by('-id')
         # can't use distinct() because sqlite doesn't support it
         # and postgres won't do it with an order_by
@@ -164,3 +182,5 @@ class ReviewLog(models.Model):
     reviewer = models.ForeignKey(User)
     created_at = models.DateTimeField(auto_now_add=True)
     message = models.TextField()
+
+    visibility_level = models.IntegerField()
