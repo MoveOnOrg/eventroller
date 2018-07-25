@@ -289,13 +289,17 @@ Reviewer.prototype = {
     for (var i=0,l=pks.length; i<l; i++) {
       var reviewSubject = this.state[pks[i]];
       if (reviewSubject.o && reviewSubject.data) {
-        reviewSubject.o.innerHTML = this.render(reviewSubject);
-        this.postRender(reviewSubject);
+        const opt = this.opt
+        this.$.getJSON(this.opt.apiPath + '/delete_auth/' + opt.organization + '/')
+          .then(canDelete => {
+              reviewSubject.o.innerHTML = this.render(reviewSubject, canDelete);
+              this.postRender(reviewSubject);
+          });
       }
     }
   },
   //from scratch
-  render: function(reviewSubject) {
+  render: function(reviewSubject, canDelete) {
     var self = this;
     return (''
             + '<div class="review-widget">'
@@ -316,7 +320,7 @@ Reviewer.prototype = {
             + ' </div>'
             + ' <b>Notes:</b>'
             + ' <div class="logs well well-sm" aria-labelledby="Notes">'
-            +      this.renderLog(reviewSubject)
+            +      this.renderLog(reviewSubject, canDelete)
             + ' </div>'
             + '</div>'
            )
@@ -350,7 +354,7 @@ Reviewer.prototype = {
       this.renderLogUpdate(reviewSubject);
     }
   },
-  renderLog: function(reviewSubject) {
+  renderLog: function(reviewSubject, canDelete) {
     if (!reviewSubject.log || !reviewSubject.log.length) {
       return '';
     }
@@ -364,6 +368,8 @@ Reviewer.prototype = {
       var tsStr = ((dateStr == new Date().toLocaleDateString()) ? timeStr : dateStr);
       var other = isHostLog(log);
       var hue = 10*(parseInt(log.pk||0) % 36);
+      const deleteButton = `<button class="btn btn-danger delete" data-id=${log.id} data-click="false"><span class="glyphicon glyphicon-trash"></span></button>`;
+
       return (''
               + '<div class="logitem"'
               + ((other && log.pk) ? ' data-pk="'+log.pk+'" style="background-color: hsl('+hue+',17%,80%)"' : '')
@@ -372,7 +378,8 @@ Reviewer.prototype = {
               + '<span class="reviewer">' + log.r + '</span>'
               + ' (' + tsStr + '): '
               + '<span class="logm">' + log.m + '</span>'
-              + `<button class="btn btn-danger delete" data-id=${log.id} data-click="false"><span class="glyphicon glyphicon-trash"></span></button>`
+              // + canDelete ? deleteButton : ''
+              + `${canDelete ? deleteButton : ''}`
               + '</div>'
              );
     };
@@ -467,6 +474,7 @@ Reviewer.prototype = {
         });
       }
     });
+    // self.handleDelete(reviewSubject);
     self.addDeleteListeners(reviewSubject);
 
     // 4 Add a placeholder div for the delete undo alerts
@@ -489,5 +497,22 @@ Reviewer.prototype = {
         });
       }
     })
+  },
+  addDeleteButtons: function() {
+
+    const deleteButton = document.createElement('button');
+    deleteButton.classList.add("btn", "btn-danger", "delete");
+  },
+  handleDelete: function(reviewSubject) {
+    let ableToDelete
+    const opt = this.opt
+
+    this.$.getJSON(this.opt.apiPath + '/delete_auth/' + opt.organization + '/')
+      .then(data => {
+        ableToDelete = data;
+        if (ableToDelete) {
+          console.log("hello")
+        }
+      });
   },
 };
