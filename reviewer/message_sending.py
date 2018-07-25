@@ -109,7 +109,7 @@ class MessageSendingAdminMixin:
                  'placeholder': self.send_a_message_placeholder,
                  'link': api_link})
         except NoReverseMatch:
-            return None
+            return ''
     send_message_widget.short_description = 'Send a message'
     send_message_widget.allow_tags = True
 
