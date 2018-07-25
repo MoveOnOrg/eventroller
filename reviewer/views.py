@@ -37,19 +37,16 @@ FOCUS_MAX = getattr(settings, 'REVIEWER_FOCUS_MAX', 30)
 # queue_size should probably be less than focus_max
 QUEUE_SIZE = getattr(settings, 'REVIEWER_QUEUE_SIZE', 12)
 
+
 def reviewgroup_auth(view_func):
     """
     Confirms that user is in a ReviewGroup of the appropriate organization.
     Note: Assumes that `organization` is the first view parameter (after request)
     """
     def wrapped(request, organization, *args, **kw):
-        allowed = ReviewGroup.org_groups(organization)
-        allowed_groups = set([x.group_id for x in allowed])
-        group_ids = set(request.user.groups.values_list('id', flat=True))
-        if not group_ids.intersection(allowed_groups) \
-           and not request.user.is_superuser:
-            return HttpResponseForbidden('nope')
-        return view_func(request, organization, *args, **kw)
+        if ReviewGroup.user_allowed(request.user, organization):
+            return view_func(request, organization, *args, **kw)
+        return HttpResponseForbidden('nope')
     return wrapped
 
 @reviewgroup_auth
