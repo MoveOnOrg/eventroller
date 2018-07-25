@@ -184,13 +184,14 @@ Reviewer.prototype = {
     const url = opt.apiPath + ['', opt.organization, opt.contentType, deletedReview.pk, reviewId, ''].join('/');
     var csrfmiddlewaretoken = this.$('input[name=csrfmiddlewaretoken]').val();
 
-    // alert("Confirm deletion");
     this.$.ajax({
       url: url,
       method: 'DELETE',
       beforeSend: xhr => {
         xhr.setRequestHeader('X-CSRFToken', csrfmiddlewaretoken);
-      },
+      }
+    }).then(() => {
+      this.pollState();
     });
   },
   deleteReviewTemporarily: function(e, reviewSubject) {
@@ -376,7 +377,6 @@ Reviewer.prototype = {
               + '<span class="reviewer">' + log.r + '</span>'
               + ' (' + tsStr + '): '
               + '<span class="logm">' + log.m + '</span>'
-              // + canDelete ? deleteButton : ''
               + `${log.canDelete ? deleteButton : ''}`
               + '</div>'
       );
@@ -472,7 +472,6 @@ Reviewer.prototype = {
         });
       }
     });
-    // self.handleDelete(reviewSubject);
     self.addDeleteListeners(reviewSubject);
 
     // 4 Add a placeholder div for the delete undo alerts
