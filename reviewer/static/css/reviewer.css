@@ -18,13 +18,13 @@ span.glyphicon-trash {
 }
 
 div.logs.well {
-  max-height: 400px;
+  max-height: 290px;
   overflow-y: scroll;
 }
 
 div.undo-delete {
   position: fixed;
-  bottom: 1em;
-  left: 1em;
-  width: 25em;
+  bottom: 6rem;
+  left: 13.5rem;
+  width: 35rem;
 }
