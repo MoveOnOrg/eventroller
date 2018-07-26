@@ -74,6 +74,7 @@ class Review(models.Model):
         TODO: this may require more work when supporting multi-select
         """
         content_type = ContentType.objects.get_for_model(content_queryset.model)
+        obj_ids = [x.id for x in content_queryset]
         result = Review.objects.bulk_create([
             Review(organization=organization,
                    reviewer=reviewer,
@@ -81,9 +82,9 @@ class Review(models.Model):
                    decision=decision,
                    object_id=obj_id,
                    content_type=content_type)
-            for obj_id in content_queryset.values_list('id', flat=True)
+            for obj_id in obj_ids
         ])
-        cls.bulk_clear_review_cache(content_queryset, organization)
+        cls.bulk_clear_review_cache(obj_ids, content_type.id, organization)
         return result
 
     @classmethod
