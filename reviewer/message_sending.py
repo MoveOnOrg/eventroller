@@ -54,7 +54,7 @@ class MessageSendingAdminMixin:
         elif request.method == 'POST' and self.message_send_ready():
             obj = self.message_obj_lookup(obj_id, organization, request)
             if obj:
-                self.send_messages(request.POST.get('message',''), [event])
+                self.send_messages(request.POST.get('message',''), [obj])
                 result = 'success'
         response_json = json.dumps({'result': result})
         return HttpResponse(response_json, content_type='application/json')
