@@ -149,7 +149,7 @@ Reviewer.prototype = {
     var decisions = [];
     for (var i=0,l=opt.schema.length;i<l;i++) {
       var name = opt.schema[i].name;
-      if (name in reviewSubject.data) { // reviewSubject.data gets updated in postRender save button listener
+      if (name in reviewSubject.data) {
         decisions.push(name + ':' + reviewSubject.data[name]);
       }
     }
@@ -218,6 +218,7 @@ Reviewer.prototype = {
         },0);
         // 3. update objects and update dom async-ly
         var changedPks = [];
+        var mode = 'multi'
         for (var i=0,l=data.reviews.length; i<l; i++) {
           var review = data.reviews[i];
           if (review.pk in self.state
@@ -228,7 +229,7 @@ Reviewer.prototype = {
             var reviewSubject = self.state[review.pk];
             reviewSubject.data = review;
             (window.requestAnimationFrame||window.setTimeout)(function() {
-              self.renderDecisionsUpdate(reviewSubject);
+              self.renderDecisionsUpdate(reviewSubject,mode);
             },0);
           }
         }
@@ -250,33 +251,24 @@ Reviewer.prototype = {
       pks = Object.keys(this.state);
     }
     for (var i=0,l=pks.length; i<l; i++) {
-      // set multi mode flag (for tag select) if URL is right; there might be a nicer way
-      var pathArray = window.location.pathname.split( '/' );
-      var mode = 'single';
-      if (pathArray[1] == 'admin' && pathArray[2] == 'actionkit' && pathArray[3] == 'coreuser') {
-        mode = 'multi';
-      }
       var reviewSubject = this.state[pks[i]];
       if (reviewSubject.o && reviewSubject.data) {
-        reviewSubject.o.innerHTML = this.render(reviewSubject, mode); 
-        this.postRender(reviewSubject, mode);
+        reviewSubject.o.innerHTML = this.render(reviewSubject);
+        this.postRender(reviewSubject);
       }
     }
   },
   //from scratch
-  render: function(reviewSubject, mode = 'single') {
+  render: function(reviewSubject) {
     var self = this;
-    var prefix = this.prefix;
+    var mode = 'multi';
     return (''
             + '<div class="review-widget">'
             + ' <div class="row">'
             + '  <div class="col-md-10">'
-            + (mode === 'multi' 
-                ? self.renderDecisionsMulti(this.opt.schema, reviewSubject)
-                : this.opt.schema.map(function(schema) {
+            +      this.opt.schema.map(function(schema) {
                       return self.renderDecisions(schema, reviewSubject, mode)
                    }).join('')
-              )
             + '    <div class="form-inline form-group">'
             + '      <label>Note </label> <input class="log form-control" type="text" />'
             + '    </div>'
@@ -340,62 +332,50 @@ Reviewer.prototype = {
   renderLogUpdate: function(reviewSubject) {
     this.$('.logs', reviewSubject.o).html(this.renderLog(reviewSubject));
   },
-  renderDecisions: function(schema, reviewSubject) {
+  renderDecisions: function(schema, reviewSubject, mode = "single") {
     var prefix = this.prefix;
     var name = schema.name;
-    return (''
-            + '<div class="form-group form-inline"><label>'+schema.label+'</label> '
-            + '<select class="form-control review-select-'+name+'" data-name="'+name+'" name="'+prefix+name+'_'+reviewSubject.pk+'">'
-            + schema.choices.map(function(o) {
+    var markup = ''
+              + '<div class="form-group form-inline">'
+              + '<label>'+schema.label+'</label> '
+              + '<select'+ mode === 'multi'? ' style="display: none;"':'' + ' class="form-control review-select-'+name+'" data-name="'+name+'" name="'+prefix+name+'_'+reviewSubject.pk+'">'
+              + schema.choices.map(function(o) {
                 return '<option '+(reviewSubject.data[name]==o[0]?'selected="selected"':'')+' value="'+o[0]+'">'+o[1]+'</option>';
               }).join('')
-            + '</select></div>');
+              + '</select></div>'
+              + '<input type="checkbox" name="review-checkbox-'+name+' id="'+prefix+name+'_'+reviewSubject.pk+'" value="" class="tag-checkbox">' + choice[1]
+    if (mode === "multi") {
+      var choice = schema.choices[1]
+      var alt_select_markup = ''      
+        + '<input type="checkbox" class="review-checkbox-'+name+'" data-name="'+name+'" name="'+prefix+name+'_'+reviewSubject.pk+'">'
+        + choice[1]
+        + '</label></div>'
+      markup += alt_select_markup
+    } 
+    return markup
   },
-  renderDecisionsMulti: function(schema, reviewSubject) {
-    // if multi mode (as for tags), render a single select list with all of the reviews
-    // grouped by label
-    var prefix = this.prefix;
-    var tag_data = {};
-    for (var j=0; j < schema.length; j++) {
-      var current = schema[j];
-      var item = {
-        'record': current['choices'][1][0], // tags are recorded in `name (category)` format in review.decision
-        'display': current['choices'][1][1], // display should contain only tag.name,
-        'id': current['name'], // review.key
-      };
-      if (!tag_data[current['label']]) { // label = category for tags
-        tag_data[current['label']] = []
-      };
-      tag_data[current['label']].push(item)
-    };
-    var markup = ''
-    + '    <div class="form-inline form-group"><label>Tags</label>'
-    + '      <select multiple class="chosen-select" data-placeholder="Select or search tags" name="'
-    + prefix + '_' + reviewSubject.pk + '">'
-    + Object.keys(tag_data).map(function(key){
-        return(''
-          + '        <optgroup label="'+key+'">'
-          + tag_data[key].map(function(o){
-            return (''
-              + '          <option ' + ((reviewSubject.data[o.id])?'selected="selected"':'')
-              + ' value="' + o['record'] + '" data-name="' + o['id'] + '">' 
-              + o['display'] + '</option>'
-            )        
-          }).join('')
-          + '        </optgroup>'
-        )
-      }).join('')
-    + '      </select>'
-    + '    </div>';
-    return markup;
-  },
-  renderDecisionsUpdate: function(reviewSubject) {
+  
+
+  // for tags:
+  // schema.name is the id, saved in review.key
+  // schema.label is the visible input label
+  // schema.choices are the choices (empty and name (category))
+  // prefix+name+'_'+reviewSubject.pk is the reviewer ID + tag id + member AK ID
+  // (reviewSubject.pk is saved in review.object_id)
+  // o[0] = tag value saved in review.decision, and o[1] is the displayed tag name
+ 
+
+  renderDecisionsUpdate: function(reviewSubject, mode = "single") {
     if (!reviewSubject.o) { throw "cannot call renderUpdate unless we have a dom object"; }
     var $ = this.$;
     this.opt.schema.map(function(schema) {
       var val = reviewSubject.data[schema.name];
       if (val) {
-        $('.review-select-'+schema.name, reviewSubject.o).val(val);
+        if (mode === "multi") {
+          $('.review-checkbox-'+schema.name, reviewSubject.o).val(val);
+        } else {
+          $('.review-select-'+schema.name, reviewSubject.o).val(val);
+        }
       }
     });
   },
@@ -410,7 +390,7 @@ Reviewer.prototype = {
   renderFocusUpdate: function(reviewSubject) {
     this.$('.focus', reviewSubject.o).html(this.renderFocus(reviewSubject));
   },
-  postRender: function(reviewSubject, mode) {
+  postRender: function(reviewSubject) {
     var $ = this.$;
     var self = this;
     // A. any 'attention' on a review marks attention
@@ -425,27 +405,18 @@ Reviewer.prototype = {
       evt.preventDefault(); //disable submitting page
       // 1. get values from dom
       var reviews = {};
-      $('option:selected', reviewSubject.o).each(function() {
+      $('select', reviewSubject.o).each(function() {
         var name = $(this).attr('data-name');
         var val = $(this).val();
         reviews[name] = val;
       });
       var log = $('input.log', reviewSubject.o).val().replace(/^\s+/,'').replace(/\s+$/,'');
-      // 2. make sure something changed and if it did, update reviewSubject.data
-
+      // 2. make sure something changed
       var changed = Boolean(log);
       for (var a in reviews) {
         if (reviewSubject.data[a] != reviews[a]) {
           reviewSubject.data[a] = reviews[a];
           changed = true;
-        }
-      }
-      if (mode === 'multi') { // check for deleted tags in multiselect mode
-        for (var b in reviewSubject.data) {
-          if (reviews[b] != reviewSubject.data[b]) {
-            delete reviewSubject.data[b];
-            changed = true;
-          }
         }
       }
       // 3. saveReview()
@@ -458,11 +429,5 @@ Reviewer.prototype = {
         });
       }
     });
-    if (mode === 'multi') {
-      this.loadChosen();
-    }
-  },
-  loadChosen: function() {
-    $('.chosen-select').chosen({width: "100%", display_selected_options: false});
   }
 };
