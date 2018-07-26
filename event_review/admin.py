@@ -30,7 +30,7 @@ def phone_format(phone):
                        re.sub(r'^(\d{3})(\d{3})(\d{4})', '(\\1) \\2-\\3',
                               phone))
 
-def host_format(event):
+def host_format(modeladmin, event):
     host = event.organization_host
     host_line = [format_html('{}', host)]
     host_items = []
@@ -51,8 +51,10 @@ def host_format(event):
     host_link = event.host_edit_url(edit_access=True)
     if host_link:
         host_items.append(format_html('<a href="{}">Act as host</a>', host_link))
-        if getattr(host, 'email', None) and getattr(settings, 'FROM_EMAIL', None):
-            host_items.append(message_to_host(event))
+        if (getattr(host, 'email', None)
+            and getattr(settings, 'FROM_EMAIL', None)
+            and getattr(modeladmin, 'send_message_widget', None)):
+            host_items.append(modeladmin.send_message_widget(event))
 
     # from the connector
     extra_html=event.extra_management_html()
@@ -78,7 +80,7 @@ def message_to_host(event):
              'placeholder': 'Optional message to host. Email will include a link to manage the event.',
              'link': api_link})
     except NoReverseMatch:
-        return None
+        return ''
 
 
 def long_field(longtext, heading=''):
@@ -88,26 +90,31 @@ def long_field(longtext, heading=''):
                        + '<div style="max-height: 7.9em; max-width: 600px; overflow-y: auto" class="well well-sm">{}</div>',
                        longtext)
 
-def event_list_display(obj, onecol=False):
-    scope = obj.get_political_scope_display()
-    if scope:
-        scope = ' ({})'.format(scope)
-    second_col = ''
-    if not onecol:
-        second_col = format_html("""
-          <div class="col-md-6">
-            <div><b>Private Phone:</b> {private_phone}</div>
-            <div><b>Event Status:</b> {active_status}</div>
-            {review_widget}
-            {internal_notes}
-          </div>
-        """,
-        private_phone=phone_format(obj.private_phone),
-        active_status=obj.status,
-        review_widget=review_widget(obj, obj.organization_host_id),
-        internal_notes=(long_field(obj.internal_notes,'<b>Past Notes</b>') if obj.internal_notes else '')
-        )
-    return format_html("""
+
+class EventDisplayAdminMixin:
+    ## BEGIN display
+    def event_list_display(self, obj, onecol=False):
+        scope = obj.get_political_scope_display()
+        if scope:
+            scope = ' ({})'.format(scope)
+        second_col = ''
+        if not onecol:
+            second_col = format_html(
+                """
+                <div class="col-md-6">
+                  <div><b>Private Phone:</b> {private_phone}</div>
+                  <div><b>Event Status:</b> {active_status}</div>
+                  {review_widget}
+                  {internal_notes}
+                </div>
+                """,
+                private_phone=phone_format(obj.private_phone),
+                active_status=obj.status,
+                review_widget=review_widget(obj, obj.organization_host_id),
+                internal_notes=(long_field(obj.internal_notes,'<b>Past Notes</b>') if obj.internal_notes else '')
+            )
+        return format_html(
+            """
         <div class="row">
             <div class="col-md-6">
                 <h5>{title} ({pk}) {private}</h5>
@@ -126,27 +133,32 @@ def event_list_display(obj, onecol=False):
             {second_col}
         </div>
         """,
-        title=obj.title,
-        pk=obj.organization_source_pk,
-        venue=obj.venue,
-        address='%s %s' % (obj.address1, obj.address2),
-        city=obj.city,
-        state=obj.state,
-        political_scope=scope,
-        when=obj.starts_at.strftime('%c'),
-        attendee_count=obj.attendee_count,
-        max_attendees='/%s' % obj.max_attendees
-                      if obj.max_attendees else '',
-        private=mark_safe('<div class="label label-danger">Private</div>')
-                if obj.is_private else '',
-        host=host_format(obj),
-        second_col=second_col,
-        description=long_field(obj.public_description),
-        directions=long_field(obj.directions),
-        note_to_attendees=long_field(obj.note_to_attendees))
+            title=obj.title,
+            pk=obj.organization_source_pk,
+            venue=obj.venue,
+            address='%s %s' % (obj.address1, obj.address2),
+            city=obj.city,
+            state=obj.state,
+            political_scope=scope,
+            when=obj.starts_at.strftime('%c'),
+            attendee_count=obj.attendee_count,
+            max_attendees=('/%s' % obj.max_attendees
+                           if obj.max_attendees else ''),
+            private=(mark_safe('<div class="label label-danger">Private</div>')
+                     if obj.is_private else ''),
+            host=host_format(self, obj),
+            second_col=second_col,
+            description=long_field(obj.public_description),
+            directions=long_field(obj.directions),
+            note_to_attendees=long_field(obj.note_to_attendees))
+    ## END display
+
+
+
 
 @admin.register(Event)
-class EventAdmin(MessageSendingAdminMixin, admin.ModelAdmin):
+class EventAdmin(MessageSendingAdminMixin, admin.ModelAdmin, EventDisplayAdminMixin):
+    # NOTE: MessageSendingAdminMixin must appear before admin.ModelAdmin in order for its get_urls() method to be used
     def changelist_view(self, request, extra_context=None):
         extra_context = {'title': 'Event admin tool'}
         return super(EventAdmin, self).changelist_view(request, extra_context=extra_context)
@@ -156,7 +168,7 @@ class EventAdmin(MessageSendingAdminMixin, admin.ModelAdmin):
     filters_require_submit = True
     disable_list_headers = True
     list_striped = True
-    list_display = (event_list_display, 'send_message_widget')
+    list_display = ('event_list_display',)
     list_filter = (ReviewerOrganizationFilter,
                    ('organization_campaign', CampaignFilter),
                    ('organization_status_review', filter_with_emptyvalue('new')),

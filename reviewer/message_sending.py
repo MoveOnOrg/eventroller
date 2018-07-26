@@ -9,6 +9,7 @@ from django.http import HttpResponse
 from django.template.loader import render_to_string
 from django.template.response import TemplateResponse
 from django.urls import reverse, NoReverseMatch
+from django.utils.safestring import mark_safe
 
 from reviewer.models import ReviewGroup
 
@@ -53,7 +54,7 @@ class MessageSendingAdminMixin:
         elif request.method == 'POST' and self.message_send_ready():
             obj = self.message_obj_lookup(obj_id, organization, request)
             if obj:
-                self.send_messages(request.POST.get('message',''), [event])
+                self.send_messages(request.POST.get('message',''), [obj])
                 result = 'success'
         response_json = json.dumps({'result': result})
         return HttpResponse(response_json, content_type='application/json')
@@ -102,14 +103,15 @@ class MessageSendingAdminMixin:
     def send_message_widget(self, obj):
         try:
             api_link = reverse('admin:'+self.send_message_path(), args=[self.obj2orgslug(obj), obj.id])
-            return render_to_string(
-                'reviewer/message_send_widget.html',
-                {'obj_id':obj.pk,
-                 'widget_id': random.randint(1,10000),
-                 'placeholder': self.send_a_message_placeholder,
-                 'link': api_link})
+            return mark_safe(
+                render_to_string(
+                    'reviewer/message_send_widget.html',
+                    {'obj_id':obj.pk,
+                     'widget_id': random.randint(1,10000),
+                     'placeholder': self.send_a_message_placeholder,
+                     'link': api_link}))
         except NoReverseMatch:
-            return None
+            return ''
     send_message_widget.short_description = 'Send a message'
     send_message_widget.allow_tags = True
 
