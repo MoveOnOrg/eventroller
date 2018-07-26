@@ -179,14 +179,11 @@ Reviewer.prototype = {
       if (callback) { callback(); }
     });
   },
-  deleteReview: function(e, reviewSubject) {
-    e.preventDefault();
+  deleteReviewPermanently: function(reviewId, deletedReview) {
     const opt = this.opt;
-    const reviewId = parseInt(e.currentTarget.dataset.id);
-    const url = opt.apiPath + ['', opt.organization, opt.contentType, reviewSubject.pk, reviewId, ''].join('/');
+    const url = opt.apiPath + ['', opt.organization, opt.contentType, deletedReview.pk, reviewId, ''].join('/');
     var csrfmiddlewaretoken = this.$('input[name=csrfmiddlewaretoken]').val();
 
-    window.confirm('Confirm deletion');
     this.$.ajax({
       url: url,
       method: 'DELETE',
@@ -194,11 +191,32 @@ Reviewer.prototype = {
         xhr.setRequestHeader('X-CSRFToken', csrfmiddlewaretoken);
       }
     }).then(() => {
-      reviewSubject.log = reviewSubject.log.filter(logObj => {
-        return logObj.id !== reviewId;
-      });
-      this.renderLogUpdate(reviewSubject);
+      this.pollState();
     });
+  },
+  deleteReviewTemporarily: function(e, reviewSubject) {
+    e.preventDefault();
+    window.confirm('Are you sure you want to delete?');
+
+    const reviewId = parseInt(e.currentTarget.dataset.id);
+
+    let deletedReview;
+    reviewSubject.log = reviewSubject.log.filter(logObj => {
+      if (logObj.id === reviewId) { deletedReview = logObj; }
+      return logObj.id !== reviewId;
+    });
+    this.renderLogUpdate(reviewSubject);
+
+    let deleteTimeout = setTimeout(() => {
+      this.deleteReviewPermanently(reviewId, deletedReview);
+    }, 7000);
+    this.renderDeleteUndoAlert(reviewSubject, deleteTimeout, deletedReview, true);
+  },
+  handleUndelete: function(reviewSubject, reviewObject) {
+    reviewSubject.log.unshift(reviewObject);
+    if (reviewSubject.log[1].id > reviewObject.id) {
+      reviewSubject.log = reviewSubject.log.sort((a, b) => ( b.id - a.id ));
+    }
   },
   pollState: function() {
     var self = this;
@@ -310,6 +328,32 @@ Reviewer.prototype = {
   },
   renderSaveUpdate: function(reviewSubject) {
     this.$('.saved', reviewSubject.o).html('saved!').show().fadeOut(2000);
+  },
+  renderDeleteUndoAlert: function(reviewSubject, timeout, reviewObject, undo) {
+    let undoAlertDiv = document.querySelector('div.undo-delete');
+    const message = undo ?
+      'Note deleted. &emsp;<a class="alert-link undo-delete" href="javascript:;" data-click="false">Undo</a>' :
+      'Note undeleted.';
+    undoAlertDiv.innerHTML =
+      '<button type="button" class="close" data-dismiss="alert">&times;</button>'
+      + message;
+    undoAlertDiv.classList.add('alert', 'alert-info');
+
+    const fadeTime = undo ? 7000 : 4000;
+
+    this.$('div.undo-delete').stop(false, true);
+    this.$('div.undo-delete').show().fadeOut(fadeTime, 'swing');
+    let undoLink = document.querySelector('a.undo-delete');
+
+    if (undo) {
+      undoLink.addEventListener('click', () => {
+        this.renderDeleteUndoAlert(reviewSubject, timeout, reviewObject, false);
+      });
+    } else {
+      clearTimeout(timeout);
+      this.handleUndelete(reviewSubject, reviewObject);
+      this.renderLogUpdate(reviewSubject);
+    }
   },
   renderLog: function(reviewSubject) {
     if (!reviewSubject.log || !reviewSubject.log.length) {
@@ -431,6 +475,12 @@ Reviewer.prototype = {
       }
     });
     self.addDeleteListeners(reviewSubject);
+
+    // 4 Add a placeholder div for the delete undo alerts
+    let undoAlertHTML = document.createElement('div');
+    undoAlertHTML.classList.add('undo-delete');
+    this.$('p.paginator').append(undoAlertHTML);
+
   },
   addDeleteListeners: function(reviewSubject) {
     // Delete reviews (notes)
@@ -442,7 +492,7 @@ Reviewer.prototype = {
       if (button.dataset.click === 'false') {
         button.dataset.click = true;
         button.addEventListener('click', e => {
-          this.deleteReview(e, reviewSubject);
+          this.deleteReviewTemporarily(e, reviewSubject);
         });
       }
     });
