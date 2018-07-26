@@ -65,6 +65,7 @@ class Review(models.Model):
                                       " -- this allows multiple keys per-object"),
                            default="review")
     decision = models.CharField(max_length=128)
+    is_current = models.BooleanField(default=True)
 
     @classmethod
     def bulk_add_tag(cls, content_queryset, organization, reviewer, key, decision):
@@ -99,7 +100,7 @@ class Review(models.Model):
             key=key,
             content_type=content_type,
             object_id__in=obj_ids
-        ).delete()
+        ).update(is_current=False)
         cls.bulk_clear_review_cache(obj_ids, content_type.id, organization)
         return result
 
@@ -122,7 +123,7 @@ class Review(models.Model):
         if not queryset:
             queryset = cls.objects
         if filterargs:
-            queryset = queryset.filter(**filterargs)
+            queryset = queryset.filter(is_current=True).filter(**filterargs)
         query = queryset.order_by('-id')
         # can't use distinct() because sqlite doesn't support it
         # and postgres won't do it with an order_by
