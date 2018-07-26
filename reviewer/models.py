@@ -32,6 +32,14 @@ class ReviewGroup(models.Model):
         unique_together = ('organization', 'group')
 
     @classmethod
+    def user_allowed(cls, user, organization):
+        allowed = ReviewGroup.org_groups(organization)
+        allowed_groups = set([x.group_id for x in allowed])
+        group_ids = set(user.groups.values_list('id', flat=True))
+        return (group_ids.intersection(allowed_groups)
+                or user.is_superuser)
+
+    @classmethod
     def org_groups(cls, organization_slug):
         """
         memo-ize orgs--it'll be a long time before we're too big for memory
