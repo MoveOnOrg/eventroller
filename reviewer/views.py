@@ -117,7 +117,10 @@ def save_review(request, organization, content_type, pk):
             redis.hset(reviewskey, obj_key, json_str)
             redis.lpush(itemskey, json_str)
             redis.ltrim(itemskey, 0, QUEUE_SIZE)
-            return JsonResponse({'id': newReviewLog.id, 'canDelete': canDelete})
+            if log_message:
+                return JsonResponse({'id': newReviewLog.id, 'canDelete': canDelete})
+            else:
+                return HttpResponse("ok")
     return HttpResponse("nope!")
 
 
