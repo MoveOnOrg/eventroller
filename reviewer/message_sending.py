@@ -9,6 +9,7 @@ from django.http import HttpResponse
 from django.template.loader import render_to_string
 from django.template.response import TemplateResponse
 from django.urls import reverse, NoReverseMatch
+from django.utils.safestring import mark_safe
 
 from reviewer.models import ReviewGroup
 
@@ -102,12 +103,13 @@ class MessageSendingAdminMixin:
     def send_message_widget(self, obj):
         try:
             api_link = reverse('admin:'+self.send_message_path(), args=[self.obj2orgslug(obj), obj.id])
-            return render_to_string(
-                'reviewer/message_send_widget.html',
-                {'obj_id':obj.pk,
-                 'widget_id': random.randint(1,10000),
-                 'placeholder': self.send_a_message_placeholder,
-                 'link': api_link})
+            return mark_safe(
+                render_to_string(
+                    'reviewer/message_send_widget.html',
+                    {'obj_id':obj.pk,
+                     'widget_id': random.randint(1,10000),
+                     'placeholder': self.send_a_message_placeholder,
+                     'link': api_link}))
         except NoReverseMatch:
             return ''
     send_message_widget.short_description = 'Send a message'
