@@ -107,6 +107,8 @@ Reviewer.prototype = {
                   )
       .then(function(data) {
         if (data.reviews && data.reviews.length == pks.length) {
+          self.state.canDelete = data.can_delete;
+
           // In theory, the api delivers the reviews and logs back in the same
           // order as they were asked for.
           // So data.logs[i] should be for pks[i], but when there
@@ -165,16 +167,64 @@ Reviewer.prototype = {
         log: log,
         subject: reviewSubject.subject
       }
-    }).then(function() {
+    }).then(function(data) {
       if (log) {
         if (!reviewSubject.log) { reviewSubject.log = []; }
-        reviewSubject.log.unshift({"m":log,
-                         "r":'<i>me</i>',
-                         "pk": reviewSubject.pk,
-                         "ts":parseInt(Number(new Date())/1000)})
+        reviewSubject.log.unshift({'m':log,
+          'r':'<i>me</i>',
+          'pk': reviewSubject.pk,
+          'ts': parseInt(Number(new Date())/1000),
+          'id': parseInt(data.id),
+        });
       }
       if (callback) { callback(); }
     });
+  },
+  deleteReviewPermanently: function(reviewId, deletedReview) {
+    const opt = this.opt;
+    const url = opt.apiPath + ['', opt.organization, opt.contentType, deletedReview.pk, reviewId, ''].join('/');
+    var csrfmiddlewaretoken = this.$('input[name=csrfmiddlewaretoken]').val();
+
+    this.$.ajax({
+      url: url,
+      method: 'DELETE',
+      beforeSend: xhr => {
+        xhr.setRequestHeader('X-CSRFToken', csrfmiddlewaretoken);
+      }
+    }).then(() => {
+      this.pollState();
+    });
+  },
+  deleteReviewTemporarily: function(e, reviewSubject) {
+    // The idea between deleting temporarily and permanentely is giving the
+    // user the option to undo the delete for some period of time
+    e.preventDefault();
+    if (confirm('Are you sure you want to delete?')) {
+      const reviewId = parseInt(e.currentTarget.dataset.id);
+
+      // Here we store the deleted review in its own variable, filter it out
+      // from the reviewSubject logs, and render the logs. To the user, it
+      // appears as if the review has been deleted.
+      let deletedReview;
+      reviewSubject.log = reviewSubject.log.filter(logObj => {
+        if (logObj.id === reviewId) { deletedReview = logObj; }
+        return logObj.id !== reviewId;
+      });
+      this.renderLogUpdate(reviewSubject);
+
+      // The timeout is assigned to a variable so that it can be cancelled in
+      // case the user clicks undo.
+      let deleteTimeout = setTimeout(() => {
+        this.deleteReviewPermanently(reviewId, deletedReview);
+      }, 7000);
+      this.renderDeleteUndoAlert(reviewSubject, deleteTimeout, deletedReview, true);
+    }
+  },
+  handleUndelete: function(reviewSubject, reviewObject) {
+    reviewSubject.log.unshift(reviewObject);
+    if (reviewSubject.log[1].id > reviewObject.id) {
+      reviewSubject.log = reviewSubject.log.sort((a, b) => ( b.id - a.id ));
+    }
   },
   pollState: function() {
     var self = this;
@@ -278,7 +328,7 @@ Reviewer.prototype = {
             + '  </div>'
             + ' </div>'
             + ' <b>Notes:</b>'
-            + ' <div class="logs well well-sm" aria-labelledby="Notes" style="max-height:7em;overflow-y:scroll">'
+            + ' <div class="logs well well-sm" aria-labelledby="Notes">'
             +      this.renderLog(reviewSubject)
             + ' </div>'
             + '</div>'
@@ -287,20 +337,62 @@ Reviewer.prototype = {
   renderSaveUpdate: function(reviewSubject) {
     this.$('.saved', reviewSubject.o).html('saved!').show().fadeOut(2000);
   },
+  renderDeleteUndoAlert: function(reviewSubject, timeout, reviewObject, undo) {
+    /*
+    This method receives:
+      - The review subject and deleted review so that they can be
+      re-rendered in case of undo
+      - The timeout so that it can be cancelled in case of undo
+      - A boolean to let the function know whether to render an alert with an
+        'undo' link or an alert saying the delete action has been undone. Each
+        alert type triggers their own actions.
+    */
+    let undoAlertDiv = document.querySelector('div.undo-delete');
+    const message = undo ?
+      'Note deleted. &emsp;<a class="alert-link undo-delete" href="javascript:;" data-click="false">Undo</a>' :
+      'Note undeleted.';
+    undoAlertDiv.innerHTML =
+      '<button type="button" class="close" data-dismiss="alert">&times;</button>'
+      + message;
+    undoAlertDiv.classList.add('alert', 'alert-info');
+
+    const fadeTime = undo ? 7000 : 4000;
+
+    this.$('div.undo-delete').stop(false, true);
+    this.$('div.undo-delete').show().fadeOut(fadeTime, 'swing');
+    let undoLink = document.querySelector('a.undo-delete');
+
+    if (undo) {
+      // The first time this is shown the innerHTML has an <a>nchor that
+      // undoes deletion. When they click undo, this same function is called,
+      // but with the last argument set to false, meaning the log deletion
+      // should be undone
+      undoLink.addEventListener('click', () => {
+        this.renderDeleteUndoAlert(reviewSubject, timeout, reviewObject, false);
+      });
+    } else {
+      // Message deletion should be undone.
+      clearTimeout(timeout);
+      this.handleUndelete(reviewSubject, reviewObject);
+      this.renderLogUpdate(reviewSubject);
+    }
+  },
   renderLog: function(reviewSubject) {
     if (!reviewSubject.log || !reviewSubject.log.length) {
       return '';
     }
     var isHostLog = function(log) {
       return (reviewSubject.pk != log.pk);
-    }
-    var renderLogHtml = function(log) {
+    };
+    var renderLogHtml = log => {
       var d = new Date(log.ts * 1000);
       var dateStr = d.toLocaleDateString();
       var timeStr = d.toLocaleTimeString().replace(/:\d\d /,' ').toLowerCase();
       var tsStr = ((dateStr == new Date().toLocaleDateString()) ? timeStr : dateStr);
       var other = isHostLog(log);
       var hue = 10*(parseInt(log.pk||0) % 36);
+      const deleteButton = `<button class="btn btn-danger delete" data-id=${log.id} data-click="false"><span class="glyphicon glyphicon-trash"></span></button>`;
+
       return (''
               + '<div class="logitem"'
               + ((other && log.pk) ? ' data-pk="'+log.pk+'" style="background-color: hsl('+hue+',17%,80%)"' : '')
@@ -309,11 +401,13 @@ Reviewer.prototype = {
               + '<span class="reviewer">' + log.r + '</span>'
               + ' (' + tsStr + '): '
               + '<span class="logm">' + log.m + '</span>'
+              + `${this.state.canDelete ? deleteButton : ''}`
               + '</div>'
-             );
+      );
     };
     var eventNotes = '';
     var hostNotes = '';
+
     reviewSubject.log.map(function(log) {
       if (isHostLog(log)) {
         hostNotes = hostNotes + renderLogHtml(log);
@@ -324,11 +418,12 @@ Reviewer.prototype = {
     if (hostNotes) {
       eventNotes = eventNotes + '<div><b>Host Notes (from past events)</b></div>' + hostNotes;
     }
-    return eventNotes
+    return eventNotes;
 
   },
   renderLogUpdate: function(reviewSubject) {
     this.$('.logs', reviewSubject.o).html(this.renderLog(reviewSubject));
+    this.addDeleteListeners(reviewSubject);
   },
   renderDecisions: function(schema, reviewSubject) {
     var prefix = this.prefix;
@@ -342,7 +437,7 @@ Reviewer.prototype = {
             + '</select></div>');
   },
   renderDecisionsUpdate: function(reviewSubject) {
-    if (!reviewSubject.o) { throw "cannot call renderUpdate unless we have a dom object"; }
+    if (!reviewSubject.o) { throw 'cannot call renderUpdate unless we have a dom object'; }
     var $ = this.$;
     this.opt.schema.map(function(schema) {
       var val = reviewSubject.data[schema.name];
@@ -356,7 +451,7 @@ Reviewer.prototype = {
       return '';
     }
     return reviewSubject.focus.map(function(reviewer) {
-      return '<span class="label label-info">'+reviewer+'</span>'
+      return '<span class="label label-info">'+reviewer+'</span>';
     }).join('');
   },
   renderFocusUpdate: function(reviewSubject) {
@@ -401,5 +496,27 @@ Reviewer.prototype = {
         });
       }
     });
-  }
+    self.addDeleteListeners(reviewSubject);
+
+    // 4 Add a placeholder div for the delete undo alerts
+    let undoAlertHTML = document.createElement('div');
+    undoAlertHTML.classList.add('undo-delete');
+    this.$('p.paginator').append(undoAlertHTML);
+
+  },
+  addDeleteListeners: function(reviewSubject) {
+    // Delete reviews (notes)
+    // 1. Select all delete buttons
+    const deleteButtons = document.querySelectorAll('button.delete');
+
+    // 2. Add event listener to each button and call the deleteReview function
+    deleteButtons.forEach(button => {
+      if (button.dataset.click === 'false') {
+        button.dataset.click = true;
+        button.addEventListener('click', e => {
+          this.deleteReviewTemporarily(e, reviewSubject);
+        });
+      }
+    });
+  },
 };
