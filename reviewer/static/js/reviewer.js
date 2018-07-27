@@ -34,7 +34,8 @@ function Reviewer(opts) {
                    ['bad', 'bad']],
        'label': 'Review Status'
       }
-    ]
+    ],
+    selectMode: 'single'
   };
   this.init(opts);
 }
@@ -296,35 +297,30 @@ Reviewer.prototype = {
       });
   },
   initRenderAll: function(pks) {
+    console.log("init render, selectMode", this.opt.selectMode)
     if (!pks) {
       pks = Object.keys(this.state);
     }
     for (var i=0,l=pks.length; i<l; i++) {
-      // set multi mode flag (for tag select) if URL is right; there might be a nicer way
-      var pathArray = window.location.pathname.split( '/' );
-      var mode = 'single';
-      if (pathArray[1] == 'admin' && pathArray[2] == 'actionkit' && pathArray[3] == 'coreuser') {
-        mode = 'multi';
-      }
       var reviewSubject = this.state[pks[i]];
       if (reviewSubject.o && reviewSubject.data) {
-        reviewSubject.o.innerHTML = this.render(reviewSubject, mode); 
-        this.postRender(reviewSubject, mode);
+        reviewSubject.o.innerHTML = this.render(reviewSubject, this.opt.selectMode); 
+        this.postRender(reviewSubject, this.opt.selectMode);
       }
     }
   },
   //from scratch
-  render: function(reviewSubject, mode = 'single') {
+  render: function(reviewSubject, selectMode) {
     var self = this;
     var prefix = this.prefix;
     return (''
             + '<div class="review-widget">'
             + ' <div class="row">'
             + '  <div class="col-md-10">'
-            + (mode === 'multi' 
+            + (selectMode === 'multiselect' 
                 ? self.renderDecisionsMulti(this.opt.schema, reviewSubject)
                 : this.opt.schema.map(function(schema) {
-                      return self.renderDecisions(schema, reviewSubject, mode)
+                      return self.renderDecisions(schema, reviewSubject)
                    }).join('')
               )
             + '    <div class="form-inline form-group">'
@@ -447,7 +443,7 @@ Reviewer.prototype = {
             + '</select></div>');
   },
   renderDecisionsMulti: function(schema, reviewSubject) {
-    // if multi mode (as for tags), render a single select list with all of the reviews
+    // if multiselect mode (as for tags), render a single select list with all of the reviews
     // grouped by label
     var prefix = this.prefix;
     var tag_data = {};
@@ -505,7 +501,7 @@ Reviewer.prototype = {
   renderFocusUpdate: function(reviewSubject) {
     this.$('.focus', reviewSubject.o).html(this.renderFocus(reviewSubject));
   },
-  postRender: function(reviewSubject, mode) {
+  postRender: function(reviewSubject, selectMode) {
     var $ = this.$;
     var self = this;
     // A. any 'attention' on a review marks attention
@@ -535,7 +531,7 @@ Reviewer.prototype = {
           changed = true;
         }
       }
-      if (mode === 'multi') { // check for deleted tags in multiselect mode
+      if (mode === 'multiselect') { // check for deleted tags in multiselect mode
         for (var b in reviewSubject.data) {
           if (reviews[b] != reviewSubject.data[b]) {
             delete reviewSubject.data[b];
@@ -560,7 +556,7 @@ Reviewer.prototype = {
     undoAlertHTML.classList.add('undo-delete');
     this.$('p.paginator').append(undoAlertHTML);
 
-    if (mode === 'multi') {
+    if (selectMode === 'multiselect') {
       this.loadChosen();
     }
 

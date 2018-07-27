@@ -20,7 +20,8 @@
                                    contentType: {{spec.content_type.id}},
                                    jQuery: window.jQuery || django.jQuery,
                                    pollRate: {{spec.poll_rate}},
-                                   apiPath: "{{spec.get_path}}"
+                                   apiPath: "{{spec.get_path}}",
+                                   selectMode: "{{spec.select_mode}}",
                                   }));
   (window.jQuery || django.jQuery)(function() {
     setTimeout(reviewState.start, 0);
