@@ -178,7 +178,6 @@ def get_review_history(request, organization):
                              'm': r['message'],
                              'ts': int(time.mktime(r['created_at'].timetuple())),
                              'id': r['id'],
-                             'can_delete': can_delete,
                          } for r in review_logs]})
     reviews = []
 
@@ -206,7 +205,8 @@ def get_review_history(request, organization):
             redis.hset(reviewskey, obj_key, json_str)
             reviews.append(json_str)
     return HttpResponse(
-        """{"reviews":[%s],"logs":%s}""" % (','.join(reviews), json.dumps(logs)),
+        """{"reviews":[%s],"logs":%s, "can_delete":%s}""" %
+        (','.join(reviews), json.dumps(logs), json.dumps(can_delete)),
         content_type='application/json')
 
 

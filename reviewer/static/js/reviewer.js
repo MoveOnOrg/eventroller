@@ -107,6 +107,8 @@ Reviewer.prototype = {
                   )
       .then(function(data) {
         if (data.reviews && data.reviews.length == pks.length) {
+          self.state.canDelete = data.can_delete;
+
           // In theory, the api delivers the reviews and logs back in the same
           // order as they were asked for.
           // So data.logs[i] should be for pks[i], but when there
@@ -388,7 +390,7 @@ Reviewer.prototype = {
     var isHostLog = function(log) {
       return (reviewSubject.pk != log.pk);
     };
-    var renderLogHtml = function(log) {
+    var renderLogHtml = log => {
       var d = new Date(log.ts * 1000);
       var dateStr = d.toLocaleDateString();
       var timeStr = d.toLocaleTimeString().replace(/:\d\d /,' ').toLowerCase();
@@ -405,7 +407,7 @@ Reviewer.prototype = {
               + '<span class="reviewer">' + log.r + '</span>'
               + ' (' + tsStr + '): '
               + '<span class="logm">' + log.m + '</span>'
-              + `${log.can_delete ? deleteButton : ''}`
+              + `${this.state.canDelete ? deleteButton : ''}`
               + '</div>'
       );
     };
