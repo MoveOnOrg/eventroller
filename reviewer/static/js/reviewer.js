@@ -297,7 +297,6 @@ Reviewer.prototype = {
       });
   },
   initRenderAll: function(pks) {
-    console.log("init render, selectMode", this.opt.selectMode)
     if (!pks) {
       pks = Object.keys(this.state);
     }
@@ -516,14 +515,13 @@ Reviewer.prototype = {
       evt.preventDefault(); //disable submitting page
       // 1. get values from dom
       var reviews = {};
-      $('option:selected', reviewSubject.o).each(function() {
+      $((selectMode === 'multiselect' ? 'option:selected' : 'select'), reviewSubject.o).each(function() {
         var name = $(this).attr('data-name');
         var val = $(this).val();
         reviews[name] = val;
       });
       var log = $('input.log', reviewSubject.o).val().replace(/^\s+/,'').replace(/\s+$/,'');
       // 2. make sure something changed and if it did, update reviewSubject.data
-
       var changed = Boolean(log);
       for (var a in reviews) {
         if (reviewSubject.data[a] != reviews[a]) {
@@ -531,7 +529,7 @@ Reviewer.prototype = {
           changed = true;
         }
       }
-      if (mode === 'multiselect') { // check for deleted tags in multiselect mode
+      if (selectMode === 'multiselect') { // check for deleted tags in multiselect mode
         for (var b in reviewSubject.data) {
           if (reviews[b] != reviewSubject.data[b]) {
             delete reviewSubject.data[b];
