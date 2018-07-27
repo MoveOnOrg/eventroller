@@ -175,7 +175,6 @@ Reviewer.prototype = {
           'pk': reviewSubject.pk,
           'ts': parseInt(Number(new Date())/1000),
           'id': parseInt(data.id),
-          'canDelete': data.can_delete
         });
       }
       if (callback) { callback(); }
@@ -213,11 +212,8 @@ Reviewer.prototype = {
       });
       this.renderLogUpdate(reviewSubject);
 
-      // We create a timeout to send a DELETE request to the server and assign
-      // it to a variable so that it can be cancelled in case the user clicks
-      // undo. We pass all this information to the render alert method. If the
-      // user doesn't click undo, the timeout finishes and the log is
-      // permanentely deleted
+      // The timeout is assigned to a variable so that it can be cancelled in
+      // case the user clicks undo.
       let deleteTimeout = setTimeout(() => {
         this.deleteReviewPermanently(reviewId, deletedReview);
       }, 7000);
@@ -375,9 +371,7 @@ Reviewer.prototype = {
         this.renderDeleteUndoAlert(reviewSubject, timeout, reviewObject, false);
       });
     } else {
-      // Message deletion should be undone. Clear the deleteReviewPermanently
-      // timeout, re-insert the deleted log into the review subjects log and
-      // re-render
+      // Message deletion should be undone.
       clearTimeout(timeout);
       this.handleUndelete(reviewSubject, reviewObject);
       this.renderLogUpdate(reviewSubject);
