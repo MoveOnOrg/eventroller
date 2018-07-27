@@ -173,7 +173,7 @@ Reviewer.prototype = {
           'pk': reviewSubject.pk,
           'ts': parseInt(Number(new Date())/1000),
           'id': parseInt(data.id),
-          'canDelete': data.canDelete
+          'canDelete': data.can_delete
         });
       }
       if (callback) { callback(); }
@@ -195,22 +195,32 @@ Reviewer.prototype = {
     });
   },
   deleteReviewTemporarily: function(e, reviewSubject) {
+    // The idea between deleting temporarily and permanentely is giving the
+    // user the option to undo the delete for some period of time
     e.preventDefault();
-    window.confirm('Are you sure you want to delete?');
+    if (confirm('Are you sure you want to delete?')) {
+      const reviewId = parseInt(e.currentTarget.dataset.id);
 
-    const reviewId = parseInt(e.currentTarget.dataset.id);
+      // Here we store the deleted review in its own variable, filter it out
+      // from the reviewSubject logs, and render the logs. To the user, it
+      // appears as if the review has been deleted.
+      let deletedReview;
+      reviewSubject.log = reviewSubject.log.filter(logObj => {
+        if (logObj.id === reviewId) { deletedReview = logObj; }
+        return logObj.id !== reviewId;
+      });
+      this.renderLogUpdate(reviewSubject);
 
-    let deletedReview;
-    reviewSubject.log = reviewSubject.log.filter(logObj => {
-      if (logObj.id === reviewId) { deletedReview = logObj; }
-      return logObj.id !== reviewId;
-    });
-    this.renderLogUpdate(reviewSubject);
-
-    let deleteTimeout = setTimeout(() => {
-      this.deleteReviewPermanently(reviewId, deletedReview);
-    }, 7000);
-    this.renderDeleteUndoAlert(reviewSubject, deleteTimeout, deletedReview, true);
+      // We create a timeout to send a DELETE request to the server and assign
+      // it to a variable so that it can be cancelled in case the user clicks
+      // undo. We pass all this information to the render alert method. If the
+      // user doesn't click undo, the timeout finishes and the log is
+      // permanentely deleted
+      let deleteTimeout = setTimeout(() => {
+        this.deleteReviewPermanently(reviewId, deletedReview);
+      }, 7000);
+      this.renderDeleteUndoAlert(reviewSubject, deleteTimeout, deletedReview, true);
+    }
   },
   handleUndelete: function(reviewSubject, reviewObject) {
     reviewSubject.log.unshift(reviewObject);
@@ -330,6 +340,15 @@ Reviewer.prototype = {
     this.$('.saved', reviewSubject.o).html('saved!').show().fadeOut(2000);
   },
   renderDeleteUndoAlert: function(reviewSubject, timeout, reviewObject, undo) {
+    /*
+    This method receives:
+      - The review subject and deleted review so that they can be
+      re-rendered in case of undo
+      - The timeout so that it can be cancelled in case of undo
+      - A boolean to let the function know whether to render an alert with an
+        'undo' link or an alert saying the delete action has been undone. Each
+        alert type triggers their own actions.
+    */
     let undoAlertDiv = document.querySelector('div.undo-delete');
     const message = undo ?
       'Note deleted. &emsp;<a class="alert-link undo-delete" href="javascript:;" data-click="false">Undo</a>' :
@@ -346,10 +365,17 @@ Reviewer.prototype = {
     let undoLink = document.querySelector('a.undo-delete');
 
     if (undo) {
+      // The first time this is shown the innerHTML has an <a>nchor that
+      // undoes deletion. When they click undo, this same function is called,
+      // but with the last argument set to false, meaning the log deletion
+      // should be undone
       undoLink.addEventListener('click', () => {
         this.renderDeleteUndoAlert(reviewSubject, timeout, reviewObject, false);
       });
     } else {
+      // Message deletion should be undone. Clear the deleteReviewPermanently
+      // timeout, re-insert the deleted log into the review subjects log and
+      // re-render
       clearTimeout(timeout);
       this.handleUndelete(reviewSubject, reviewObject);
       this.renderLogUpdate(reviewSubject);
@@ -379,7 +405,7 @@ Reviewer.prototype = {
               + '<span class="reviewer">' + log.r + '</span>'
               + ' (' + tsStr + '): '
               + '<span class="logm">' + log.m + '</span>'
-              + `${log.canDelete ? deleteButton : ''}`
+              + `${log.can_delete ? deleteButton : ''}`
               + '</div>'
       );
     };

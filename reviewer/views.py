@@ -73,7 +73,7 @@ def save_review(request, organization, content_type, pk):
         subject = request.POST.get('subject')
 
         # Check for user delete permissions to include in log}
-        canDelete = request.user.has_perm('reviewer.delete_reviewlog')
+        can_delete = request.user.has_perm('reviewer.delete_reviewlog')
 
         # Saving notes will fail if there are no tags in the application
         if content_type and pk and len(decisions_str) >= 3\
@@ -118,7 +118,7 @@ def save_review(request, organization, content_type, pk):
             redis.lpush(itemskey, json_str)
             redis.ltrim(itemskey, 0, QUEUE_SIZE)
             if log_message:
-                return JsonResponse({'id': newReviewLog.id, 'canDelete': canDelete})
+                return JsonResponse({'id': newReviewLog.id, 'can_delete': can_delete})
             else:
                 return HttpResponse("ok")
     return HttpResponse("nope!")
@@ -137,7 +137,7 @@ def get_review_history(request, organization):
     reviewskey = '{}_reviews'.format(organization)
 
     # Check for user delete permissions to include in log
-    canDelete = request.user.has_perm('reviewer.delete_reviewlog')
+    can_delete = request.user.has_perm('reviewer.delete_reviewlog')
 
     content_type_id = int(request.GET.get('type'))
     ct = ContentType.objects.get_for_id(content_type_id) # confirm existence
@@ -178,7 +178,7 @@ def get_review_history(request, organization):
                              'm': r['message'],
                              'ts': int(time.mktime(r['created_at'].timetuple())),
                              'id': r['id'],
-                             'canDelete': canDelete,
+                             'can_delete': can_delete,
                          } for r in review_logs]})
     reviews = []
 
@@ -299,5 +299,6 @@ def current_review_state(request, organization):
 def delete_review(request, organization, content_type, pk, id):
     if request.method == 'DELETE':
         if request.user.has_perm('reviewer.delete_reviewlog'):
-            ReviewLog.objects.get(id=id).delete()
+            ReviewLog.objects.filter(id=id, organization__slug=organization).delete()
             return HttpResponse("deleted")
+    return HttpResponse("nope")
