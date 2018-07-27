@@ -65,6 +65,10 @@ def save_review(request, organization, content_type, pk):
         decisions_str = request.POST.get('decisions', '')
         log_message = request.POST.get('log')
         subject = request.POST.get('subject')
+        visibility_level = request.POST.get('visibility')
+        if visibility_level is None:
+            # the user's max visibility level for the org
+            visibility_level = ReviewGroup.user_visibility(organization, request.user)
         if content_type and pk and len(decisions_str) >= 3\
            and ':' in decisions_str:
             org = ReviewGroup.org_groups(organization)
@@ -78,12 +82,12 @@ def save_review(request, organization, content_type, pk):
                                                  object_id=obj.id,
                                                  key__in=[k for k, d in decisions],
                                                  organization_id=org[0].organization_id)
-                           .update(is_current=False))
+                           .update(obsoleted_at=datetime.datetime.now()))
             reviews = [Review.objects.create(content_type=ct, object_id=obj.id,
                                              organization_id=org[0].organization_id,
                                              reviewer=request.user,
-                                             key=k, decision=decision,
-                                             is_current=True)
+                                             visibility_level=int(visibility_level),
+                                             key=k, decision=decision)
                        for k, decision in decisions]
 
             if log_message:
@@ -92,6 +96,7 @@ def save_review(request, organization, content_type, pk):
                                          subject=int(subject) if subject else None,
                                          organization_id=org[0].organization_id,
                                          reviewer=request.user,
+                                         visibility_level=int(request.POST.get('log_visibility', visibility_level)),
                                          message=log_message)
             # 2. signal to obj
             if callable(getattr(obj, 'on_save_review', None)):
@@ -122,7 +127,7 @@ def get_review_history(request, organization):
     """
     redis = get_redis_connection(REDIS_CACHE_KEY)
     reviewskey = '{}_reviews'.format(organization)
-
+    visibility_level = ReviewGroup.user_visibility(organization, request.user)
     content_type_id = int(request.GET.get('type'))
     ct = ContentType.objects.get_for_id(content_type_id) # confirm existence
     pks = [pk for pk in request.GET.get('pks').split(',') if pk]
@@ -147,6 +152,7 @@ def get_review_history(request, organization):
                 filters = filters | Q(content_type_id=content_type_id,
                                       subject=int(subject))
             review_logs = ReviewLog.objects.filter(
+                visibility_level__lte=visibility_level,
                 organization__slug=organization).filter(
                     filters).order_by('-id').values('reviewer__first_name',
                                                     'reviewer__last_name',
