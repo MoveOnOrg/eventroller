@@ -147,12 +147,16 @@ Reviewer.prototype = {
       }
     });
   },
-  saveReview: function(reviewSubject, log, callback) {
+  saveReview: function(reviewSubject, selectMode, log, callback) {
     var opt = this.opt;
     var decisions = [];
     for (var i=0,l=opt.schema.length;i<l;i++) {
       var name = opt.schema[i].name;
-      if (name in reviewSubject.data) { // reviewSubject.data gets updated in postRender save button listener
+      if (selectMode === 'multiselect' && Object.keys(reviewSubject.data).length === 0) {
+        // handle case in tag multiselect where all tags are removed
+        decisions.push(name + ':' + '');
+      } else if (name in reviewSubject.data) { 
+        // reviewSubject.data gets updated in postRender save button listener
         decisions.push(name + ':' + reviewSubject.data[name]);
       }
     }
@@ -539,7 +543,7 @@ Reviewer.prototype = {
       }
       // 3. saveReview()
       if (changed) {
-        self.saveReview(reviewSubject, log || undefined, function() {
+        self.saveReview(reviewSubject, selectMode, log || undefined, function() {
           // 4. on callback: add status (and clear log message)
           self.renderSaveUpdate(reviewSubject);
           self.renderLogUpdate(reviewSubject);
