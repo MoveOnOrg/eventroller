@@ -34,7 +34,8 @@ function Reviewer(opts) {
                    ['bad', 'bad']],
        'label': 'Review Status'
       }
-    ]
+    ],
+    selectMode: 'single'
   };
   this.init(opts);
 }
@@ -146,12 +147,16 @@ Reviewer.prototype = {
       }
     });
   },
-  saveReview: function(reviewSubject, log, callback) {
+  saveReview: function(reviewSubject, selectMode, log, callback) {
     var opt = this.opt;
     var decisions = [];
     for (var i=0,l=opt.schema.length;i<l;i++) {
       var name = opt.schema[i].name;
-      if (name in reviewSubject.data) {
+      if (selectMode === 'multiselect' && Object.keys(reviewSubject.data).length === 0) {
+        // handle case in tag multiselect where all tags are removed
+        decisions.push(name + ':' + '');
+      } else if (name in reviewSubject.data) { 
+        // reviewSubject.data gets updated in postRender save button listener
         decisions.push(name + ':' + reviewSubject.data[name]);
       }
     }
@@ -302,21 +307,25 @@ Reviewer.prototype = {
     for (var i=0,l=pks.length; i<l; i++) {
       var reviewSubject = this.state[pks[i]];
       if (reviewSubject.o && reviewSubject.data) {
-        reviewSubject.o.innerHTML = this.render(reviewSubject);
-        this.postRender(reviewSubject);
+        reviewSubject.o.innerHTML = this.render(reviewSubject, this.opt.selectMode); 
+        this.postRender(reviewSubject, this.opt.selectMode);
       }
     }
   },
   //from scratch
-  render: function(reviewSubject) {
+  render: function(reviewSubject, selectMode) {
     var self = this;
+    var prefix = this.prefix;
     return (''
             + '<div class="review-widget">'
             + ' <div class="row">'
             + '  <div class="col-md-10">'
-            +      this.opt.schema.map(function(schema) {
+            + (selectMode === 'multiselect' 
+                ? self.renderDecisionsMulti(this.opt.schema, reviewSubject)
+                : this.opt.schema.map(function(schema) {
                       return self.renderDecisions(schema, reviewSubject)
                    }).join('')
+              )
             + '    <div class="form-inline form-group">'
             + '      <label>Note </label> <input class="log form-control" type="text" />'
             + '    </div>'
@@ -432,9 +441,47 @@ Reviewer.prototype = {
             + '<div class="form-group form-inline"><label>'+schema.label+'</label> '
             + '<select class="form-control review-select-'+name+'" data-name="'+name+'" name="'+prefix+name+'_'+reviewSubject.pk+'">'
             + schema.choices.map(function(o) {
-              return '<option '+(reviewSubject.data[name]==o[0]?'selected="selected"':'')+' value="'+o[0]+'">'+o[1]+'</option>';
-            }).join('')
+                return '<option '+(reviewSubject.data[name]==o[0]?'selected="selected"':'')+' value="'+o[0]+'">'+o[1]+'</option>';
+              }).join('')
             + '</select></div>');
+  },
+  renderDecisionsMulti: function(schema, reviewSubject) {
+    // if multiselect mode (as for tags), render a single select list with all of the reviews
+    // grouped by label
+    var prefix = this.prefix;
+    var tag_data = {};
+    for (var j=0; j < schema.length; j++) {
+      var current = schema[j];
+      var item = {
+        'record': current['choices'][1][0], // tags are recorded in `name (category)` format in review.decision
+        'display': current['choices'][1][1], // display should contain only tag.name,
+        'id': current['name'], // review.key
+      };
+      if (!tag_data[current['label']]) { // label = category for tags
+        tag_data[current['label']] = []
+      };
+      tag_data[current['label']].push(item)
+    };
+    var markup = ''
+    + '    <div class="form-inline form-group"><label>Tags</label>'
+    + '      <select multiple class="chosen-select" data-placeholder="Select or search tags" name="'
+    + prefix + '_' + reviewSubject.pk + '">'
+    + Object.keys(tag_data).map(function(key){
+        return(''
+          + '        <optgroup label="'+key+'">'
+          + tag_data[key].map(function(o){
+            return (''
+              + '          <option ' + ((reviewSubject.data[o.id])?'selected="selected"':'')
+              + ' value="' + o['record'] + '" data-name="' + o['id'] + '">' 
+              + o['display'] + '</option>'
+            )        
+          }).join('')
+          + '        </optgroup>'
+        )
+      }).join('')
+    + '      </select>'
+    + '    </div>';
+    return markup;
   },
   renderDecisionsUpdate: function(reviewSubject) {
     if (!reviewSubject.o) { throw 'cannot call renderUpdate unless we have a dom object'; }
@@ -457,7 +504,7 @@ Reviewer.prototype = {
   renderFocusUpdate: function(reviewSubject) {
     this.$('.focus', reviewSubject.o).html(this.renderFocus(reviewSubject));
   },
-  postRender: function(reviewSubject) {
+  postRender: function(reviewSubject, selectMode) {
     var $ = this.$;
     var self = this;
     // A. any 'attention' on a review marks attention
@@ -472,13 +519,13 @@ Reviewer.prototype = {
       evt.preventDefault(); //disable submitting page
       // 1. get values from dom
       var reviews = {};
-      $('select', reviewSubject.o).each(function() {
+      $((selectMode === 'multiselect' ? 'option:selected' : 'select'), reviewSubject.o).each(function() {
         var name = $(this).attr('data-name');
         var val = $(this).val();
         reviews[name] = val;
       });
       var log = $('input.log', reviewSubject.o).val().replace(/^\s+/,'').replace(/\s+$/,'');
-      // 2. make sure something changed
+      // 2. make sure something changed and if it did, update reviewSubject.data
       var changed = Boolean(log);
       for (var a in reviews) {
         if (reviewSubject.data[a] != reviews[a]) {
@@ -486,9 +533,17 @@ Reviewer.prototype = {
           changed = true;
         }
       }
+      if (selectMode === 'multiselect') { // check for deleted tags in multiselect mode
+        for (var b in reviewSubject.data) {
+          if (reviews[b] != reviewSubject.data[b]) {
+            delete reviewSubject.data[b];
+            changed = true;
+          }
+        }
+      }
       // 3. saveReview()
       if (changed) {
-        self.saveReview(reviewSubject, log || undefined, function() {
+        self.saveReview(reviewSubject, selectMode, log || undefined, function() {
           // 4. on callback: add status (and clear log message)
           self.renderSaveUpdate(reviewSubject);
           self.renderLogUpdate(reviewSubject);
@@ -502,6 +557,10 @@ Reviewer.prototype = {
     let undoAlertHTML = document.createElement('div');
     undoAlertHTML.classList.add('undo-delete');
     this.$('p.paginator').append(undoAlertHTML);
+
+    if (selectMode === 'multiselect') {
+      this.loadChosen();
+    }
 
   },
   addDeleteListeners: function(reviewSubject) {
@@ -519,4 +578,7 @@ Reviewer.prototype = {
       }
     });
   },
+  loadChosen: function() {
+    $('.chosen-select').chosen({width: "100%", display_selected_options: false});
+  }
 };
