@@ -33,7 +33,7 @@ class ReviewGroup(models.Model):
         help_text=("Think of it like an access hierarchy. "
                    "0 is generally the lowest level. "
                    "Anything higher is probably staff/etc. "
-                   "It affects what Reviews and Notes will be visible"))
+                   "You can see Reviews/ReviewLogs with your own visibility and lower"))
 
     class Meta:
         unique_together = ('organization', 'group')
@@ -191,5 +191,18 @@ class ReviewLog(models.Model):
     reviewer = models.ForeignKey(User)
     created_at = models.DateTimeField(auto_now_add=True)
     message = models.TextField()
-
+    log_type = models.CharField(max_length=8, default='note',
+                                choices=(
+                                    ('note', 'Note'),
+                                    ('message', 'Message'),
+                                    ('bulk_msg', 'Bulk Message')
+                                ))
     visibility_level = models.IntegerField()
+
+    class Meta:
+        permissions = (
+            ('message_sending', 'message sending'),
+            ('bulk_message_sending', 'bulk message sending'),
+            ('bulk_note_adding', 'bulk note adding'),
+            )
+
