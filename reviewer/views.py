@@ -121,13 +121,9 @@ def save_review(request, organization, content_type, pk):
             redis.lpush(itemskey, json_str)
             redis.ltrim(itemskey, 0, QUEUE_SIZE)
             if log_message:
-<<<<<<< Updated upstream
-                return JsonResponse({'id': newReviewLog.id, 'can_delete': can_delete})
-=======
                 return JsonResponse(
-                    {'id': new_review_note.id, 'canDelete': canDelete}
-                    )
->>>>>>> Stashed changes
+                    {'id': new_review_note.id, 'can_delete': can_delete}
+                )
             else:
                 return HttpResponse("ok")
     return HttpResponse("nope!")
