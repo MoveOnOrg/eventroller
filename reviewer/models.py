@@ -32,6 +32,14 @@ class ReviewGroup(models.Model):
         unique_together = ('organization', 'group')
 
     @classmethod
+    def user_allowed(cls, user, organization):
+        allowed = ReviewGroup.org_groups(organization)
+        allowed_groups = set([x.group_id for x in allowed])
+        group_ids = set(user.groups.values_list('id', flat=True))
+        return (group_ids.intersection(allowed_groups)
+                or user.is_superuser)
+
+    @classmethod
     def org_groups(cls, organization_slug):
         """
         memo-ize orgs--it'll be a long time before we're too big for memory
@@ -74,6 +82,7 @@ class Review(models.Model):
         TODO: this may require more work when supporting multi-select
         """
         content_type = ContentType.objects.get_for_model(content_queryset.model)
+        obj_ids = [x.id for x in content_queryset]
         result = Review.objects.bulk_create([
             Review(organization=organization,
                    reviewer=reviewer,
@@ -81,9 +90,9 @@ class Review(models.Model):
                    decision=decision,
                    object_id=obj_id,
                    content_type=content_type)
-            for obj_id in content_queryset.values_list('id', flat=True)
+            for obj_id in obj_ids
         ])
-        cls.bulk_clear_review_cache(content_queryset, organization)
+        cls.bulk_clear_review_cache(obj_ids, content_type.id, organization)
         return result
 
     @classmethod

@@ -34,7 +34,8 @@ function Reviewer(opts) {
                    ['bad', 'bad']],
        'label': 'Review Status'
       }
-    ]
+    ],
+    selectMode: 'single'
   };
   this.init(opts);
 }
@@ -107,6 +108,8 @@ Reviewer.prototype = {
                   )
       .then(function(data) {
         if (data.reviews && data.reviews.length == pks.length) {
+          self.state.canDelete = data.can_delete;
+
           // In theory, the api delivers the reviews and logs back in the same
           // order as they were asked for.
           // So data.logs[i] should be for pks[i], but when there
@@ -144,12 +147,16 @@ Reviewer.prototype = {
       }
     });
   },
-  saveReview: function(reviewSubject, log, callback) {
+  saveReview: function(reviewSubject, selectMode, log, callback) {
     var opt = this.opt;
     var decisions = [];
     for (var i=0,l=opt.schema.length;i<l;i++) {
       var name = opt.schema[i].name;
-      if (name in reviewSubject.data) {
+      if (selectMode === 'multiselect' && Object.keys(reviewSubject.data).length === 0) {
+        // handle case in tag multiselect where all tags are removed
+        decisions.push(name + ':' + '');
+      } else if (name in reviewSubject.data) { 
+        // reviewSubject.data gets updated in postRender save button listener
         decisions.push(name + ':' + reviewSubject.data[name]);
       }
     }
@@ -173,7 +180,6 @@ Reviewer.prototype = {
           'pk': reviewSubject.pk,
           'ts': parseInt(Number(new Date())/1000),
           'id': parseInt(data.id),
-          'canDelete': data.canDelete
         });
       }
       if (callback) { callback(); }
@@ -195,22 +201,29 @@ Reviewer.prototype = {
     });
   },
   deleteReviewTemporarily: function(e, reviewSubject) {
+    // The idea between deleting temporarily and permanentely is giving the
+    // user the option to undo the delete for some period of time
     e.preventDefault();
-    window.confirm('Are you sure you want to delete?');
+    if (confirm('Are you sure you want to delete?')) {
+      const reviewId = parseInt(e.currentTarget.dataset.id);
 
-    const reviewId = parseInt(e.currentTarget.dataset.id);
+      // Here we store the deleted review in its own variable, filter it out
+      // from the reviewSubject logs, and render the logs. To the user, it
+      // appears as if the review has been deleted.
+      let deletedReview;
+      reviewSubject.log = reviewSubject.log.filter(logObj => {
+        if (logObj.id === reviewId) { deletedReview = logObj; }
+        return logObj.id !== reviewId;
+      });
+      this.renderLogUpdate(reviewSubject);
 
-    let deletedReview;
-    reviewSubject.log = reviewSubject.log.filter(logObj => {
-      if (logObj.id === reviewId) { deletedReview = logObj; }
-      return logObj.id !== reviewId;
-    });
-    this.renderLogUpdate(reviewSubject);
-
-    let deleteTimeout = setTimeout(() => {
-      this.deleteReviewPermanently(reviewId, deletedReview);
-    }, 7000);
-    this.renderDeleteUndoAlert(reviewSubject, deleteTimeout, deletedReview, true);
+      // The timeout is assigned to a variable so that it can be cancelled in
+      // case the user clicks undo.
+      let deleteTimeout = setTimeout(() => {
+        this.deleteReviewPermanently(reviewId, deletedReview);
+      }, 7000);
+      this.renderDeleteUndoAlert(reviewSubject, deleteTimeout, deletedReview, true);
+    }
   },
   handleUndelete: function(reviewSubject, reviewObject) {
     reviewSubject.log.unshift(reviewObject);
@@ -294,21 +307,25 @@ Reviewer.prototype = {
     for (var i=0,l=pks.length; i<l; i++) {
       var reviewSubject = this.state[pks[i]];
       if (reviewSubject.o && reviewSubject.data) {
-        reviewSubject.o.innerHTML = this.render(reviewSubject);
-        this.postRender(reviewSubject);
+        reviewSubject.o.innerHTML = this.render(reviewSubject, this.opt.selectMode); 
+        this.postRender(reviewSubject, this.opt.selectMode);
       }
     }
   },
   //from scratch
-  render: function(reviewSubject) {
+  render: function(reviewSubject, selectMode) {
     var self = this;
+    var prefix = this.prefix;
     return (''
             + '<div class="review-widget">'
             + ' <div class="row">'
             + '  <div class="col-md-10">'
-            +      this.opt.schema.map(function(schema) {
+            + (selectMode === 'multiselect' 
+                ? self.renderDecisionsMulti(this.opt.schema, reviewSubject)
+                : this.opt.schema.map(function(schema) {
                       return self.renderDecisions(schema, reviewSubject)
                    }).join('')
+              )
             + '    <div class="form-inline form-group">'
             + '      <label>Note </label> <input class="log form-control" type="text" />'
             + '    </div>'
@@ -330,6 +347,15 @@ Reviewer.prototype = {
     this.$('.saved', reviewSubject.o).html('saved!').show().fadeOut(2000);
   },
   renderDeleteUndoAlert: function(reviewSubject, timeout, reviewObject, undo) {
+    /*
+    This method receives:
+      - The review subject and deleted review so that they can be
+      re-rendered in case of undo
+      - The timeout so that it can be cancelled in case of undo
+      - A boolean to let the function know whether to render an alert with an
+        'undo' link or an alert saying the delete action has been undone. Each
+        alert type triggers their own actions.
+    */
     let undoAlertDiv = document.querySelector('div.undo-delete');
     const message = undo ?
       'Note deleted. &emsp;<a class="alert-link undo-delete" href="javascript:;" data-click="false">Undo</a>' :
@@ -346,10 +372,15 @@ Reviewer.prototype = {
     let undoLink = document.querySelector('a.undo-delete');
 
     if (undo) {
+      // The first time this is shown the innerHTML has an <a>nchor that
+      // undoes deletion. When they click undo, this same function is called,
+      // but with the last argument set to false, meaning the log deletion
+      // should be undone
       undoLink.addEventListener('click', () => {
         this.renderDeleteUndoAlert(reviewSubject, timeout, reviewObject, false);
       });
     } else {
+      // Message deletion should be undone.
       clearTimeout(timeout);
       this.handleUndelete(reviewSubject, reviewObject);
       this.renderLogUpdate(reviewSubject);
@@ -362,7 +393,7 @@ Reviewer.prototype = {
     var isHostLog = function(log) {
       return (reviewSubject.pk != log.pk);
     };
-    var renderLogHtml = function(log) {
+    var renderLogHtml = log => {
       var d = new Date(log.ts * 1000);
       var dateStr = d.toLocaleDateString();
       var timeStr = d.toLocaleTimeString().replace(/:\d\d /,' ').toLowerCase();
@@ -379,7 +410,7 @@ Reviewer.prototype = {
               + '<span class="reviewer">' + log.r + '</span>'
               + ' (' + tsStr + '): '
               + '<span class="logm">' + log.m + '</span>'
-              + `${log.canDelete ? deleteButton : ''}`
+              + `${this.state.canDelete ? deleteButton : ''}`
               + '</div>'
       );
     };
@@ -410,9 +441,47 @@ Reviewer.prototype = {
             + '<div class="form-group form-inline"><label>'+schema.label+'</label> '
             + '<select class="form-control review-select-'+name+'" data-name="'+name+'" name="'+prefix+name+'_'+reviewSubject.pk+'">'
             + schema.choices.map(function(o) {
-              return '<option '+(reviewSubject.data[name]==o[0]?'selected="selected"':'')+' value="'+o[0]+'">'+o[1]+'</option>';
-            }).join('')
+                return '<option '+(reviewSubject.data[name]==o[0]?'selected="selected"':'')+' value="'+o[0]+'">'+o[1]+'</option>';
+              }).join('')
             + '</select></div>');
+  },
+  renderDecisionsMulti: function(schema, reviewSubject) {
+    // if multiselect mode (as for tags), render a single select list with all of the reviews
+    // grouped by label
+    var prefix = this.prefix;
+    var tag_data = {};
+    for (var j=0; j < schema.length; j++) {
+      var current = schema[j];
+      var item = {
+        'record': current['choices'][1][0], // tags are recorded in `name (category)` format in review.decision
+        'display': current['choices'][1][1], // display should contain only tag.name,
+        'id': current['name'], // review.key
+      };
+      if (!tag_data[current['label']]) { // label = category for tags
+        tag_data[current['label']] = []
+      };
+      tag_data[current['label']].push(item)
+    };
+    var markup = ''
+    + '    <div class="form-inline form-group"><label>Tags</label>'
+    + '      <select multiple class="chosen-select" data-placeholder="Select or search tags" name="'
+    + prefix + '_' + reviewSubject.pk + '">'
+    + Object.keys(tag_data).map(function(key){
+        return(''
+          + '        <optgroup label="'+key+'">'
+          + tag_data[key].map(function(o){
+            return (''
+              + '          <option ' + ((reviewSubject.data[o.id])?'selected="selected"':'')
+              + ' value="' + o['record'] + '" data-name="' + o['id'] + '">' 
+              + o['display'] + '</option>'
+            )        
+          }).join('')
+          + '        </optgroup>'
+        )
+      }).join('')
+    + '      </select>'
+    + '    </div>';
+    return markup;
   },
   renderDecisionsUpdate: function(reviewSubject) {
     if (!reviewSubject.o) { throw 'cannot call renderUpdate unless we have a dom object'; }
@@ -435,7 +504,7 @@ Reviewer.prototype = {
   renderFocusUpdate: function(reviewSubject) {
     this.$('.focus', reviewSubject.o).html(this.renderFocus(reviewSubject));
   },
-  postRender: function(reviewSubject) {
+  postRender: function(reviewSubject, selectMode) {
     var $ = this.$;
     var self = this;
     // A. any 'attention' on a review marks attention
@@ -450,13 +519,13 @@ Reviewer.prototype = {
       evt.preventDefault(); //disable submitting page
       // 1. get values from dom
       var reviews = {};
-      $('select', reviewSubject.o).each(function() {
+      $((selectMode === 'multiselect' ? 'option:selected' : 'select'), reviewSubject.o).each(function() {
         var name = $(this).attr('data-name');
         var val = $(this).val();
         reviews[name] = val;
       });
       var log = $('input.log', reviewSubject.o).val().replace(/^\s+/,'').replace(/\s+$/,'');
-      // 2. make sure something changed
+      // 2. make sure something changed and if it did, update reviewSubject.data
       var changed = Boolean(log);
       for (var a in reviews) {
         if (reviewSubject.data[a] != reviews[a]) {
@@ -464,9 +533,17 @@ Reviewer.prototype = {
           changed = true;
         }
       }
+      if (selectMode === 'multiselect') { // check for deleted tags in multiselect mode
+        for (var b in reviewSubject.data) {
+          if (reviews[b] != reviewSubject.data[b]) {
+            delete reviewSubject.data[b];
+            changed = true;
+          }
+        }
+      }
       // 3. saveReview()
       if (changed) {
-        self.saveReview(reviewSubject, log || undefined, function() {
+        self.saveReview(reviewSubject, selectMode, log || undefined, function() {
           // 4. on callback: add status (and clear log message)
           self.renderSaveUpdate(reviewSubject);
           self.renderLogUpdate(reviewSubject);
@@ -480,6 +557,10 @@ Reviewer.prototype = {
     let undoAlertHTML = document.createElement('div');
     undoAlertHTML.classList.add('undo-delete');
     this.$('p.paginator').append(undoAlertHTML);
+
+    if (selectMode === 'multiselect') {
+      this.loadChosen();
+    }
 
   },
   addDeleteListeners: function(reviewSubject) {
@@ -497,4 +578,7 @@ Reviewer.prototype = {
       }
     });
   },
+  loadChosen: function() {
+    $('.chosen-select').chosen({width: "100%", display_selected_options: false});
+  }
 };
