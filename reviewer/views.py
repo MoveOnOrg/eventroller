@@ -12,6 +12,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django_redis import get_redis_connection
 
 from reviewer.models import Review, ReviewLog, ReviewGroup
+from reviewer.signals import review_log_saved
 
 """
   This api tries to keep things super-fast using redis datastructures
@@ -93,8 +94,9 @@ def save_review(request, organization, content_type, pk):
                                              is_current=True)
                        for k, decision in decisions]
 
+            new_review_note = None
             if log_message:
-                newReviewLog = ReviewLog.objects.create(content_type=ct,
+                new_review_note = ReviewLog.objects.create(content_type=ct,
                                          object_id=obj.id,
                                          subject=int(subject) if subject else None,
                                          organization_id=org[0].organization_id,
@@ -103,7 +105,11 @@ def save_review(request, organization, content_type, pk):
             # 2. signal to obj
             if callable(getattr(obj, 'on_save_review', None)):
                 obj.on_save_review(reviews, log_message)
-            # 3. save to redis
+            # 3. Send signal to actionkit_membersearch/admin
+            if ct.__class__ == 'coreuser':
+                review_log_saved.send(sender=ct.__class__, tags=reviews,
+                                      note=new_review_note)
+            # 4. save to redis
             json_obj = {"type": ct.id,
                         "pk": obj.id,
                         'ts': int(time.mktime(datetime.datetime.utcnow().timetuple()))}
@@ -115,7 +121,13 @@ def save_review(request, organization, content_type, pk):
             redis.lpush(itemskey, json_str)
             redis.ltrim(itemskey, 0, QUEUE_SIZE)
             if log_message:
+<<<<<<< Updated upstream
                 return JsonResponse({'id': newReviewLog.id, 'can_delete': can_delete})
+=======
+                return JsonResponse(
+                    {'id': new_review_note.id, 'canDelete': canDelete}
+                    )
+>>>>>>> Stashed changes
             else:
                 return HttpResponse("ok")
     return HttpResponse("nope!")
