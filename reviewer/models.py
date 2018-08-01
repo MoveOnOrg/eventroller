@@ -108,7 +108,8 @@ class Review(models.Model):
             reviewer=reviewer,
             key=key,
             content_type=content_type,
-            object_id__in=obj_ids
+            object_id__in=obj_ids,
+            is_current=True
         ).update(is_current=False)
         cls.bulk_clear_review_cache(obj_ids, content_type.id, organization)
         return result
