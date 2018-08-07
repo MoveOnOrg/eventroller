@@ -102,8 +102,9 @@ def save_review(request, organization, content_type, pk):
                                         subject=int(subject) if subject else None,
                                         organization_id=org[0].organization_id,
                                         reviewer=request.user,
-                                        log_type='note'
-                                        visibility_level=int(request.POST.get('log_visibility', visibility_level)),
+                                        log_type='note',
+                                        visibility_level=int(request.POST.get('log_visibility')
+                                                             or visibility_level),
                                         message=log_message)
             # 2. signal to obj
             if callable(getattr(obj, 'on_save_review', None)):

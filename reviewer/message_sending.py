@@ -152,7 +152,7 @@ class MessageSendingAdminMixin:
         perms_needed = False # TODO: set permissions
         count = queryset.count()
         max_send = getattr(settings, "MESSAGE_SEND_MAX", 200)
-        if not perms_needed count and count <= max_send:
+        if not perms_needed and count and count <= max_send:
             message = request.POST.get('message','')
             if message and request.POST.get('post'):
                 modeladmin.send_messages(message, list(queryset),
@@ -162,10 +162,18 @@ class MessageSendingAdminMixin:
         else:
             title = "Cannot send messages"
 
+        organization_slug = request.POST.get('organization')
+        if not organization_slug:
+            rgroups = ReviewGroup.user_review_groups(request.user)
+            if len(rgroups) == 1:
+                organization_slug = rgroups[0].organization.slug
+
         context = dict(
             modeladmin.admin_site.each_context(request),
             title=title,
-            visibility_options=ReviewGroup.user_visibility_options(
+            visibility_options=(
+                ReviewGroup.user_visibility_options(organization_slug, request.user)
+                if organization_slug else None),
             objects_name=objects_name,
             queryset=queryset,
             count=count,
