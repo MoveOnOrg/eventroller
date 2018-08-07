@@ -122,6 +122,9 @@ class MessageSendingAdminMixin:
     def obj2subjectid(self, obj):
         return None
 
+    def obj_person_noun(self):
+        return 'host'
+
     def send_message_widget(self, obj):
         try:
             api_link = reverse('admin:'+self.send_message_path(), args=[self.obj2org(obj).slug, obj.id])
@@ -131,6 +134,7 @@ class MessageSendingAdminMixin:
                     {'obj_id':obj.pk,
                      'widget_id': random.randint(1,10000),
                      'placeholder': self.send_a_message_placeholder,
+                     'nounperson': self.obj_person_noun(),
                      'link': api_link}))
         except NoReverseMatch:
             return ''
