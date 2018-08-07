@@ -98,12 +98,13 @@ def save_review(request, organization, content_type, pk):
 
             if log_message:
                 newReviewLog = ReviewLog.objects.create(content_type=ct,
-                                         object_id=obj.id,
-                                         subject=int(subject) if subject else None,
-                                         organization_id=org[0].organization_id,
-                                         reviewer=request.user,
-                                         visibility_level=int(request.POST.get('log_visibility', visibility_level)),
-                                         message=log_message)
+                                        object_id=obj.id,
+                                        subject=int(subject) if subject else None,
+                                        organization_id=org[0].organization_id,
+                                        reviewer=request.user,
+                                        log_type='note'
+                                        visibility_level=int(request.POST.get('log_visibility', visibility_level)),
+                                        message=log_message)
             # 2. signal to obj
             if callable(getattr(obj, 'on_save_review', None)):
                 obj.on_save_review(reviews, log_message)
@@ -137,6 +138,7 @@ def get_review_history(request, organization):
     redis = get_redis_connection(REDIS_CACHE_KEY)
     reviewskey = '{}_reviews'.format(organization)
     visibility_level = ReviewGroup.user_visibility(organization, request.user)
+    vis_options = ReviewGroup.user_visibility_options(organization, request.user)
 
     # Check for user delete permissions to include in log
     can_delete = request.user.has_perm('reviewer.delete_reviewlog')
@@ -172,6 +174,8 @@ def get_review_history(request, organization):
                                                     'message',
                                                     'created_at',
                                                     'object_id',
+                                                    'log_type',
+                                                    'visibility_level',
                                                     'id',
                                                 )
             logs.append({"pk": pk, 'type': content_type_id,
@@ -180,6 +184,8 @@ def get_review_history(request, organization):
                              'pk': r['object_id'], #for subject search broadening
                              'm': r['message'],
                              'ts': int(time.mktime(r['created_at'].timetuple())),
+                             't': r['log_type'],
+                             'v': r['visibility_level'],
                              'id': r['id'],
                          } for r in review_logs]})
     reviews = []
@@ -208,8 +214,11 @@ def get_review_history(request, organization):
             redis.hset(reviewskey, obj_key, json_str)
             reviews.append(json_str)
     return HttpResponse(
-        """{"reviews":[%s],"logs":%s, "can_delete":%s}""" %
-        (','.join(reviews), json.dumps(logs), json.dumps(can_delete)),
+        """{"reviews":[%s],"logs":%s, "can_delete":%s, "visibility": %s}""" %
+        (','.join(reviews),
+         json.dumps(logs),
+         json.dumps(can_delete),
+         json.dumps(list(vis_options.items()))),
         content_type='application/json')
 
 

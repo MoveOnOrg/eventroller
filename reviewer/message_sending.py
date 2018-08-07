@@ -11,7 +11,7 @@ from django.template.response import TemplateResponse
 from django.urls import reverse, NoReverseMatch
 from django.utils.safestring import mark_safe
 
-from reviewer.models import ReviewGroup
+from reviewer.models import ReviewGroup, ReviewLog
 
 class MessageSendingAdminMixin:
     """
@@ -32,6 +32,8 @@ class MessageSendingAdminMixin:
     * message_template: Customize the email content that goes out from the message and the object
     """
     send_a_message_placeholder = 'Send a message'
+    # something to track the organization, to send options for visibility
+    review_organization_filter = None
 
     def send_message_path(self):
         return '{app_label}_{model_name}_send_message'.format(
@@ -48,13 +50,15 @@ class MessageSendingAdminMixin:
         return urls + my_urls
 
     def send_message(self, request, organization, obj_id):
+        self.user = request.user
         result = 'failed to send'
         if not ReviewGroup.user_allowed(request.user, organization):
             result = 'permission denied'
         elif request.method == 'POST' and self.message_send_ready():
             obj = self.message_obj_lookup(obj_id, organization, request)
             if obj:
-                self.send_messages(request.POST.get('message',''), [obj])
+                self.send_messages(request.POST.get('message',''), [obj],
+                                   visibility=request.POST.get('visibility'))
                 result = 'success'
         response_json = json.dumps({'result': result})
         return HttpResponse(response_json, content_type='application/json')
@@ -76,7 +80,7 @@ class MessageSendingAdminMixin:
             'from_line': settings.FROM_EMAIL,
         }
 
-    def send_messages(self, message, objects, actually_send=True):
+    def send_messages(self, message, objects, actually_send=True, visibility=None):
         """
         1. create EmailMessage objects using template_func as an adapter/transformer to objects
         2. save message to object (in reviewlog or contactmessage thingie
@@ -93,16 +97,34 @@ class MessageSendingAdminMixin:
             connection.send_messages(messages)
         else:
             print(messages) # TODO remove debug
-        # TODO: save messages into reviewlog or similar
+        # save messages into reviewlog or similar
+        if message and getattr(self, 'user'):
+            msg_count = len(objects)
+            for obj in objects:
+                org = self.obj2org(obj)
+                subject_id = self.obj2subjectid(obj)
+                if visibility is None:
+                    visibility = ReviewGroup.user_visibility(org.slug, self.user)
+                review_log = ReviewLog.objects.create(content_type=ContentType.objects.get_for_model(obj._meta.model),
+                                                      object_id=obj.id,
+                                                      subject=subject_id,
+                                                      organization_id=org.id,
+                                                      reviewer=self.user,
+                                                      log_type='message' if msg_count == 1 else 'bulk_msg',
+                                                      visibility_level=int(visibility),
+                                                      message=message)
         return messages
 
-    def obj2orgslug(self, obj):
-        """How to get the organization slug from an object.  Override for a different way"""
-        return obj.organization.slug
+    def obj2org(self, obj):
+        """How to get the organization from an object.  Override for a different way"""
+        return obj.organization
+
+    def obj2subjectid(self, obj):
+        return None
 
     def send_message_widget(self, obj):
         try:
-            api_link = reverse('admin:'+self.send_message_path(), args=[self.obj2orgslug(obj), obj.id])
+            api_link = reverse('admin:'+self.send_message_path(), args=[self.obj2org(obj).slug, obj.id])
             return mark_safe(
                 render_to_string(
                     'reviewer/message_send_widget.html',
@@ -121,6 +143,7 @@ class MessageSendingAdminMixin:
         Message sending action for a ModelAdmin that will send messages to everyone
         chosen in a queryset
         """
+        modeladmin.user = request.user
         title = "Send a message to many at once"
         objects_name = "tags"
         opts = modeladmin.model._meta
@@ -129,10 +152,11 @@ class MessageSendingAdminMixin:
         perms_needed = False # TODO: set permissions
         count = queryset.count()
         max_send = getattr(settings, "MESSAGE_SEND_MAX", 200)
-        if not perms_needed and count <= max_send:
+        if not perms_needed count and count <= max_send:
             message = request.POST.get('message','')
             if message and request.POST.get('post'):
-                modeladmin.send_messages(message, list(queryset))
+                modeladmin.send_messages(message, list(queryset),
+                                         visibility=request.POST.get('visibility'))
                 # Return None to display the change list page again.
                 return None
         else:
@@ -141,6 +165,7 @@ class MessageSendingAdminMixin:
         context = dict(
             modeladmin.admin_site.each_context(request),
             title=title,
+            visibility_options=ReviewGroup.user_visibility_options(
             objects_name=objects_name,
             queryset=queryset,
             count=count,

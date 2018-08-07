@@ -258,4 +258,7 @@ class EventAdmin(MessageSendingAdminMixin, admin.ModelAdmin, EventDisplayAdminMi
             if src and hasattr(src.api, 'get_host_event_link'):
                 return event
 
+    def obj2subjectid(self, event):
+        return event.organization_host.member_system_pk
+
     ## END EventAdmin Message Sending

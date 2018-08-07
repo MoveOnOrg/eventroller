@@ -39,6 +39,20 @@ class ReviewGroup(models.Model):
         unique_together = ('organization', 'group')
 
     @classmethod
+    def org_groups(cls, organization_slug):
+        """
+        memo-ize orgs--it'll be a long time before we're too big for memory
+        """
+        if organization_slug not in _ORGANIZATIONS:
+            _ORGANIZATIONS[organization_slug] = list(
+                ReviewGroup.objects.filter(
+                    organization__slug=organization_slug)
+                .select_related('organization', 'group')
+                # important for visibility options below
+                .order_by('-visibility_level'))
+        return _ORGANIZATIONS.get(organization_slug)
+
+    @classmethod
     def user_allowed(cls, user, organization_slug):
         allowed = ReviewGroup.org_groups(organization_slug)
         allowed_groups = set([x.group_id for x in allowed])
@@ -47,24 +61,28 @@ class ReviewGroup(models.Model):
                 or user.is_superuser)
 
     @classmethod
-    def org_groups(cls, organization_slug):
-        """
-        memo-ize orgs--it'll be a long time before we're too big for memory
-        """
-        if organization_slug not in _ORGANIZATIONS:
-            _ORGANIZATIONS[organization_slug] = list(ReviewGroup.objects.filter(
-                organization__slug=organization_slug))
-        return _ORGANIZATIONS.get(organization_slug)
-
-    @classmethod
     def user_visibility(cls, organization_slug, user):
         org_groups = ReviewGroup.org_groups(organization_slug)
         group_ids = set(user.groups.values_list('id', flat=True))
-        visibility = None
+        # ASSUMEs org_groups are ordered in descending value of visibility
+        # see org_groups()
         for org_grp in org_groups:
             if org_grp.group_id in group_ids:
-                visibility = max(visibility, org_grp.visibility_level)
-        return visibility
+                return org_grp.visibility_level
+
+    @classmethod
+    def user_visibility_options(cls, organization_slug, user):
+        org_groups = ReviewGroup.org_groups(organization_slug)
+        group_ids = set(user.groups.values_list('id', flat=True))
+
+        uservisibility = ReviewGroup.user_visibility(organization_slug, user)
+        options = {}
+        for org_grp in grp_groups:
+            if org_grp.visibility_level <= uservisibility:
+                if not options.get(org_grp.visibility_level) \
+                   or org_grp.group_id in group_ids:
+                    options[org_grp.visibility_level] = org_grp.group.name
+        return options
 
     @classmethod
     def user_review_groups(cls, user):
