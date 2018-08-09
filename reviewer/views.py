@@ -165,8 +165,7 @@ def get_review_history(request, organization):
             filters = Q(content_type_id=content_type_id,
                         object_id=int(pk))
             if subject:
-                filters = filters | Q(content_type_id=content_type_id,
-                                      subject=int(subject))
+                filters = filters | Q(subject=int(subject))
             review_logs = ReviewLog.objects.filter(
                 visibility_level__lte=visibility_level,
                 organization__slug=organization).filter(

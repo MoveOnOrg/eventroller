@@ -213,8 +213,9 @@ class ReviewLog(models.Model):
     log_type = models.CharField(max_length=8, default='note',
                                 choices=(
                                     ('note', 'Note'),
+                                    ('bulknote', 'Bulk Note'),
                                     ('message', 'Message'),
-                                    ('bulk_msg', 'Bulk Message')
+                                    ('bulkmsg', 'Bulk Message')
                                 ))
     visibility_level = models.IntegerField()
 

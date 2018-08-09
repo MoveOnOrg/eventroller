@@ -324,9 +324,9 @@ Reviewer.prototype = {
             + '  <div class="col-md-10">'
             + (selectMode === 'multiselect' 
                 ? self.renderDecisionsMulti(this.opt.schema, reviewSubject)
-                : this.opt.schema.map(function(schema) {
-                      return self.renderDecisions(schema, reviewSubject)
-                   }).join('')
+                : this.opt.schema.map(
+                  (schema) => self.renderDecisions(schema, reviewSubject)
+                ).join('')
               )
             + '    <div class="form-inline form-group">'
             + '      <label>Note </label> <input class="log form-control" type="text" />'
@@ -350,6 +350,7 @@ Reviewer.prototype = {
     this.$('.saved', reviewSubject.o).html('saved!').show().fadeOut(2000);
   },
   renderVisibility: function(vis) {
+    vis = vis || this.visibility
     if (vis && vis.length) {
       return ('<div class="form-inline"><label><span class="glyphicon glyphicon-eye-open"></span></label>'
               + ' <select class="form-control">'
@@ -414,7 +415,16 @@ Reviewer.prototype = {
       var other = isHostLog(log);
       var hue = 10*(parseInt(log.pk||0) % 36);
       const deleteButton = `<button class="btn btn-danger delete" data-id=${log.id} data-click="false"><span class="glyphicon glyphicon-trash"></span></button>`;
-
+      const typeIcon = (log.t === 'message'
+                        ? ('<span class="glyphicon glyphicon-envelope" '
+                           + ' style="padding:0 5px 0 5px" title="message"></span>')
+                        : (log.t === 'bulkmsg'
+                           ? ('<span class="glyphicon glyphicon-bullhorn" style="padding:0 5px 0 5px" '
+                              + ' title="bulk message"></span>')
+                           : (log.t === 'bulknote'
+                              ? ('<span class="glyphicon glyphicon-list-alt" style="padding:0 5px 0 5px" '
+                                 + ' title="bulk note"></span>')
+                              : '')))
       return (''
               + '<div class="logitem"'
               + ((other && log.pk) ? ' data-pk="'+log.pk+'" style="background-color: hsl('+hue+',17%,80%)"' : '')
@@ -422,7 +432,8 @@ Reviewer.prototype = {
               + ((other && log.pk) ? '-- ' : '')
               + '<span class="reviewer">' + log.r + '</span>'
               + ' (' + tsStr + '): '
-              + '<span class="logm">' + log.m + '</span>'
+              + typeIcon
+              + ' <span class="logm">' + log.m + '</span>'
               + `${this.state.canDelete ? deleteButton : ''}`
               + '</div>'
       );

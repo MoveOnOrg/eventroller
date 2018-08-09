@@ -35,7 +35,6 @@ class MessageSendingAdminMixin:
     """
     send_a_message_placeholder = 'Send a message'
     # something to track the organization, to send options for visibility
-    review_organization_filter = None
 
     def send_message_path(self):
         return '{app_label}_{model_name}_send_message'.format(
@@ -52,6 +51,20 @@ class MessageSendingAdminMixin:
                 name=self.send_message_path())
         ]
         return urls + my_urls
+
+    def get_actions(self, request):
+        actions = admin.ModelAdmin.get_actions(self, request) or {}
+        if request.user.has_perm('reviewer.bulk_message_sending'):
+            actions.update({'bulk_message_send': (
+                self.bulk_message_send,
+                'bulk_message_send',
+                'Send a message to many people')})
+        if request.user.has_perm('reviewer.bulk_note_adding'):
+            actions.update({'bulk_note_add': (
+                self.bulk_note_add,
+                'bulk_note_add',
+                'Bulk add a note')})
+        return actions
 
     def send_message(self, request, organization, obj_id):
         result = 'failed to send'
@@ -147,6 +160,10 @@ class MessageSendingAdminMixin:
             return ''
     send_message_widget.short_description = 'Send a message'
     send_message_widget.allow_tags = True
+
+    @staticmethod
+    def bulk_note_add(modeladmin, request, queryset):
+        return None
 
     @staticmethod
     def bulk_message_send(modeladmin, request, queryset):

@@ -201,14 +201,9 @@ class EventAdmin(MessageSendingAdminMixin, admin.ModelAdmin, EventDisplayAdminMi
     list_display_links = None
 
     def get_actions(self, request):
-        actions = super(EventAdmin, self).get_actions(request)
+        actions = super().get_actions(request) or {}
         if 'delete_selected' in actions:
             del actions['delete_selected']
-        ## TODO: bulk_message_send permissions conditional
-        actions.update({'bulk_message_send': (
-            self.bulk_message_send,
-            'bulk_message_send',
-            'Send a message to many people')})
         return actions
 
     def has_delete_permission(self, request, obj=None):

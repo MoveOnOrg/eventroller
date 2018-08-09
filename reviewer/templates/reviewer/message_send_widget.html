@@ -2,22 +2,17 @@
 <div id="send-message-status--{{obj_id}}--w{{widget_id|default:0}}" class="hidden">
   <b style="vertical-align:top">Message:</b>
   <textarea rows="2" style="min-width: 50%;" placeholder="{{placeholder}}"></textarea>
-  {% if visibility_options and visibility_options.1 %}
-    {# if only a single option, then we can infer it #}
-    <span class="glyphicon glyphicon-eye-close"></span>
-    <select>
-    {% for visoption, visname in visibility_options %}
-      <option value="{{ visoption }}">{{visname}}</option>
-    {% endfor %}
-    </select>
-  {% endif %}
+  <div class="js--visibility"></div>
   <button class="btn btn-sm" style="vertical-align:top">Send</button>
-  <span></span>
+  <span class="js--status"></span>
 </div>
 <script>
 $('#send-message--{{obj_id}}--w{{widget_id|default:0}}').click(function(evt) {
     var $link = $('#send-message--{{obj_id}}--w{{widget_id|default:0}}');
     var $status = $('#send-message-status--{{obj_id}}--w{{widget_id|default:0}}');
+    if (window.reviewState && window.reviewState.visibility) {
+      $('.js--visibility', $status).html(window.reviewState.renderVisibility())
+    }
     $status.removeClass('hidden');
     $('button', $status).removeClass('hidden');
     evt.preventDefault();
@@ -29,14 +24,16 @@ $('#send-message-status--{{obj_id}}--w{{widget_id|default:0}} button').click(fun
   var $link = $('#send-message--{{obj_id}}--w{{widget_id|default:0}}');
   var $status = $('#send-message-status--{{obj_id}}--w{{widget_id|default:0}}');
   $(this).addClass('hidden');
-  var $msgSpan = $('span', $status)
+  var $msgSpan = $('span.js--status', $status)
     .text('Sending ...')
     .attr('class', 'label label-warning');
+  var visibility = $('.js--visibility option:selected', $status).val()
   $.ajax({"method": "POST",
           "url": $link.attr('href'),
           "data": {
             'message': $('textarea', $status).val(),
-            'csrfmiddlewaretoken': $('input[name=csrfmiddlewaretoken]').val()
+            'csrfmiddlewaretoken': $('input[name=csrfmiddlewaretoken]').val(),
+            'visibility': visibility || undefined
           }
          })
     .then(function success(data) {
