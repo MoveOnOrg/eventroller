@@ -222,7 +222,7 @@ class ReviewLog(models.Model):
     class Meta:
         permissions = (
             ('message_sending', 'message sending'),
-            ('bulk_message_sending', 'bulk message sending'),
-            ('bulk_note_adding', 'bulk note adding'),
+            ('bulk_message_send', 'bulk message sending'),
+            ('bulk_note_add', 'bulk note adding'),
             )
 
