@@ -131,6 +131,7 @@ Reviewer.prototype = {
             }
           }
         }
+        self.visibility = data.visibility
         if (callback) {
           callback(pks, data);
         }
@@ -147,7 +148,7 @@ Reviewer.prototype = {
       }
     });
   },
-  saveReview: function(reviewSubject, selectMode, log, callback) {
+  saveReview: function(reviewSubject, selectMode, log, visibility, callback) {
     var opt = this.opt;
     var decisions = [];
     for (var i=0,l=opt.schema.length;i<l;i++) {
@@ -170,6 +171,7 @@ Reviewer.prototype = {
         pk: reviewSubject.pk,
         decisions: decisions.join(';'),
         log: log,
+        visibility: visibility,
         subject: reviewSubject.subject
       }
     }).then(function(data) {
@@ -261,7 +263,7 @@ Reviewer.prototype = {
           for (var pk in self.state) {
             if (pk in newFocus) {
               //dumbest, but easiest way to compare lists
-              if (newFocus[pk].toString() != self.state[pk].focus.toString()) {
+              if (String(newFocus[pk]) != String(self.state[pk].focus)) {
                 self.state[pk].focus = newFocus[pk];
                 self.renderFocusUpdate(self.state[pk]);
               }
@@ -328,6 +330,7 @@ Reviewer.prototype = {
               )
             + '    <div class="form-inline form-group">'
             + '      <label>Note </label> <input class="log form-control" type="text" />'
+            + this.renderVisibility(this.visibility)
             + '    </div>'
             + '  </div>'
             + '  <div class="review-header" style="padding-left:15px;">'
@@ -345,6 +348,16 @@ Reviewer.prototype = {
   },
   renderSaveUpdate: function(reviewSubject) {
     this.$('.saved', reviewSubject.o).html('saved!').show().fadeOut(2000);
+  },
+  renderVisibility: function(vis) {
+    if (vis && vis.length) {
+      return ('<div class="form-inline"><label><span class="glyphicon glyphicon-eye-open"></span></label>'
+              + ' <select class="form-control">'
+              + vis.map(
+                (v) => '<option value="'+encodeURIComponent(v[0])+'">'+v[1]+'</option>').join('')
+              + '</select></div>')
+    }
+    return ''
   },
   renderDeleteUndoAlert: function(reviewSubject, timeout, reviewObject, undo) {
     /*
@@ -525,6 +538,7 @@ Reviewer.prototype = {
         reviews[name] = val;
       });
       var log = $('input.log', reviewSubject.o).val().replace(/^\s+/,'').replace(/\s+$/,'');
+      var visibility = $('option:selected', reviewSubject.o).val();
       // 2. make sure something changed and if it did, update reviewSubject.data
       var changed = Boolean(log);
       for (var a in reviews) {
@@ -543,12 +557,14 @@ Reviewer.prototype = {
       }
       // 3. saveReview()
       if (changed) {
-        self.saveReview(reviewSubject, selectMode, log || undefined, function() {
-          // 4. on callback: add status (and clear log message)
-          self.renderSaveUpdate(reviewSubject);
-          self.renderLogUpdate(reviewSubject);
-          $('input.log', reviewSubject.o).val(''); //clear
-        });
+        self.saveReview(
+          reviewSubject, selectMode, log || undefined, visibility || undefined, 
+          function() {
+            // 4. on callback: add status (and clear log message)
+            self.renderSaveUpdate(reviewSubject);
+            self.renderLogUpdate(reviewSubject);
+            $('input.log', reviewSubject.o).val(''); //clear
+          });
       }
     });
     self.addDeleteListeners(reviewSubject);

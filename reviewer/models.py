@@ -77,7 +77,7 @@ class ReviewGroup(models.Model):
 
         uservisibility = ReviewGroup.user_visibility(organization_slug, user)
         options = {}
-        for org_grp in grp_groups:
+        for org_grp in org_groups:
             if org_grp.visibility_level <= uservisibility:
                 if not options.get(org_grp.visibility_level) \
                    or org_grp.group_id in group_ids:

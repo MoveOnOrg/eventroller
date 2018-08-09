@@ -1,9 +1,11 @@
+import json
 import random
 
 from django.core.mail import get_connection as get_mail_connection
 from django.conf import settings
 from django.conf.urls import url
 from django.contrib import admin
+from django.contrib.contenttypes.models import ContentType
 from django.core.mail import send_mail, EmailMultiAlternatives
 from django.http import HttpResponse
 from django.template.loader import render_to_string
@@ -43,22 +45,24 @@ class MessageSendingAdminMixin:
     def get_urls(self):
         urls = admin.ModelAdmin.get_urls(self)
         my_urls = [
-            url('send_message/(?P<organization>[-.\w]+)/(?P<obj_id>[-.\w]+)/',
+            # must NOT end in a '/' or it will get matched with an admin
+            # blanket-match. See django.contrib.admin.options.ModelAdmin.get_urls
+            url('send_message/(?P<organization>[-.\w]+)/(?P<obj_id>[-.\w]+)',
                 self.admin_site.admin_view(self.send_message),
                 name=self.send_message_path())
         ]
         return urls + my_urls
 
     def send_message(self, request, organization, obj_id):
-        self.user = request.user
         result = 'failed to send'
         if not ReviewGroup.user_allowed(request.user, organization):
             result = 'permission denied'
-        elif request.method == 'POST' and self.message_send_ready():
+        elif request.method == 'POST' and self.message_send_ready(organization, request):
             obj = self.message_obj_lookup(obj_id, organization, request)
             if obj:
                 self.send_messages(request.POST.get('message',''), [obj],
-                                   visibility=request.POST.get('visibility'))
+                                   visibility=request.POST.get('visibility'),
+                                   user=request.user)
                 result = 'success'
         response_json = json.dumps({'result': result})
         return HttpResponse(response_json, content_type='application/json')
@@ -80,7 +84,7 @@ class MessageSendingAdminMixin:
             'from_line': settings.FROM_EMAIL,
         }
 
-    def send_messages(self, message, objects, actually_send=True, visibility=None):
+    def send_messages(self, message, objects, actually_send=True, visibility=None, user=None):
         """
         1. create EmailMessage objects using template_func as an adapter/transformer to objects
         2. save message to object (in reviewlog or contactmessage thingie
@@ -94,22 +98,24 @@ class MessageSendingAdminMixin:
             messages.append(create_message(**message_dict))
         if actually_send:
             connection = get_mail_connection()
+            if hasattr(connection, 'open'):
+                connection.open()
             connection.send_messages(messages)
         else:
             print(messages) # TODO remove debug
         # save messages into reviewlog or similar
-        if message and getattr(self, 'user'):
+        if message and user:
             msg_count = len(objects)
             for obj in objects:
                 org = self.obj2org(obj)
                 subject_id = self.obj2subjectid(obj)
                 if visibility is None:
-                    visibility = ReviewGroup.user_visibility(org.slug, self.user)
+                    visibility = ReviewGroup.user_visibility(org.slug, user)
                 review_log = ReviewLog.objects.create(content_type=ContentType.objects.get_for_model(obj._meta.model),
                                                       object_id=obj.id,
                                                       subject=subject_id,
                                                       organization_id=org.id,
-                                                      reviewer=self.user,
+                                                      reviewer=user,
                                                       log_type='message' if msg_count == 1 else 'bulk_msg',
                                                       visibility_level=int(visibility),
                                                       message=message)
@@ -127,7 +133,8 @@ class MessageSendingAdminMixin:
 
     def send_message_widget(self, obj):
         try:
-            api_link = reverse('admin:'+self.send_message_path(), args=[self.obj2org(obj).slug, obj.id])
+            org = self.obj2org(obj)
+            api_link = reverse('admin:'+self.send_message_path(), args=[org.slug, obj.id])
             return mark_safe(
                 render_to_string(
                     'reviewer/message_send_widget.html',
@@ -147,7 +154,6 @@ class MessageSendingAdminMixin:
         Message sending action for a ModelAdmin that will send messages to everyone
         chosen in a queryset
         """
-        modeladmin.user = request.user
         title = "Send a message to many at once"
         objects_name = "tags"
         opts = modeladmin.model._meta
@@ -160,7 +166,8 @@ class MessageSendingAdminMixin:
             message = request.POST.get('message','')
             if message and request.POST.get('post'):
                 modeladmin.send_messages(message, list(queryset),
-                                         visibility=request.POST.get('visibility'))
+                                         visibility=request.POST.get('visibility'),
+                                         user=request.user)
                 # Return None to display the change list page again.
                 return None
         else:
@@ -176,7 +183,7 @@ class MessageSendingAdminMixin:
             modeladmin.admin_site.each_context(request),
             title=title,
             visibility_options=(
-                ReviewGroup.user_visibility_options(organization_slug, request.user)
+                ReviewGroup.user_visibility_options(organization_slug, request.user).items()
                 if organization_slug else None),
             objects_name=objects_name,
             queryset=queryset,
