@@ -41,6 +41,17 @@
     <form method="post">{% csrf_token %}
 
     <div class="form-row clearfix">
+        {% if visibility_options|length > 1 %}
+          {# need options and also more than one or we'll just default #}
+          <div class="form-group col-md-12">
+            <span class="glyphicon glyphicon-eye-open" title="visibility: who can see it?"></span>
+            <select name="visibility">
+              {% for visoption, visname in visibility_options %}
+              <option value="{{ visoption }}">{{visname}}</option>
+              {% endfor %}
+            </select>
+          </div>
+        {% endif %}
         <div class="form-group col-md-12">
             <textarea name="message"></textarea>
         </div>

@@ -199,9 +199,12 @@ class MessageSendingAdminMixin:
 
         organization_slug = request.POST.get('organization')
         if not organization_slug:
-            rgroups = ReviewGroup.user_review_groups(request.user)
-            if len(rgroups) == 1:
-                organization_slug = rgroups[0].organization.slug
+            orgslugs = (ReviewGroup
+                        .user_review_groups(request.user)
+                        .values_list('organization__slug', flat=True)
+                        .distinct())
+            if len(orgslugs) == 1:
+                organization_slug = orgslugs[0]
 
         if not perms_needed and count and count <= max_apply:
             message = request.POST.get('message','')
@@ -221,6 +224,7 @@ class MessageSendingAdminMixin:
         context = dict(
             modeladmin.admin_site.each_context(request),
             title=title,
+            organization_slug=organization_slug,
             visibility_options=(
                 ReviewGroup.user_visibility_options(organization_slug, request.user).items()
                 if organization_slug else None),
