@@ -354,7 +354,7 @@ Reviewer.prototype = {
     if (vis && vis.length) {
       return ('<div class="form-inline"><label>'
               + '<span class="glyphicon glyphicon-eye-open" title="visibility: who can see it"></span> </label>'
-              + ' <select class="form-control">'
+              + ' <select class="form-control visibility-select">'
               + vis.map(
                 (v) => '<option value="'+encodeURIComponent(v[0])+'">'+v[1]+'</option>').join('')
               + '</select></div>')
@@ -550,7 +550,7 @@ Reviewer.prototype = {
         reviews[name] = val;
       });
       var log = $('input.log', reviewSubject.o).val().replace(/^\s+/,'').replace(/\s+$/,'');
-      var visibility = $('option:selected', reviewSubject.o).val();
+      var visibility = $('.visibility-select option:selected', reviewSubject.o).val();
       // 2. make sure something changed and if it did, update reviewSubject.data
       var changed = Boolean(log);
       for (var a in reviews) {
