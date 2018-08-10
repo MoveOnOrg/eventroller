@@ -67,39 +67,45 @@ def save_review(request, organization, content_type, pk):
         decisions_str = request.POST.get('decisions', '')
         log_message = request.POST.get('log')
         subject = request.POST.get('subject')
+        visibility_level = request.POST.get('visibility')
+        if visibility_level is None:
+            # the user's max visibility level for the org
+            visibility_level = ReviewGroup.user_visibility(organization, request.user)
 
-        # Check for user delete permissions to include in log}
-        can_delete = request.user.has_perm('reviewer.delete_reviewlog')
-
-        # Saving notes will fail if there are no tags in the application
-        if content_type and pk and len(decisions_str) >= 3\
-           and ':' in decisions_str:
+        if content_type and pk:
             org = ReviewGroup.org_groups(organization)
             ct = ContentType.objects.get_for_id(int(content_type))
             # make sure the object exists
             # ct.get_object_for_this_type fails to cross db boundaries
             obj = ct.model_class().objects.get(pk=pk)
-            decisions = [d[:257].split(':') for d in decisions_str.split(';')]
-            # 1. save to database
-            deleted_res = (Review.objects.filter(content_type=ct,
-                                                 object_id=obj.id,
-                                                 key__in=[k for k, d in decisions],
-                                                 organization_id=org[0].organization_id)
-                           .update(is_current=False))
-            reviews = [Review.objects.create(content_type=ct, object_id=obj.id,
-                                             organization_id=org[0].organization_id,
-                                             reviewer=request.user,
-                                             key=k, decision=decision,
-                                             is_current=True)
-                       for k, decision in decisions]
+            decisions = []
+            reviews = []
+            # If there are no tags sent, we might still save a log message
+            if len(decisions_str) >= 3 and ':' in decisions_str:
+                decisions = [d[:257].split(':') for d in decisions_str.split(';')]
+                # 1. save to database
+                deleted_res = (Review.objects.filter(content_type=ct,
+                                                     object_id=obj.id,
+                                                     key__in=[k for k, d in decisions],
+                                                     organization_id=org[0].organization_id)
+                               .update(obsoleted_at=datetime.datetime.now()))
+                reviews = [Review.objects.create(content_type=ct, object_id=obj.id,
+                                                 organization_id=org[0].organization_id,
+                                                 reviewer=request.user,
+                                                 visibility_level=int(visibility_level),
+                                                 key=k, decision=decision)
+                           for k, decision in decisions]
 
             if log_message:
                 newReviewLog = ReviewLog.objects.create(content_type=ct,
-                                         object_id=obj.id,
-                                         subject=int(subject) if subject else None,
-                                         organization_id=org[0].organization_id,
-                                         reviewer=request.user,
-                                         message=log_message)
+                                        object_id=obj.id,
+                                        subject=int(subject) if subject else None,
+                                        organization_id=org[0].organization_id,
+                                        reviewer=request.user,
+                                        log_type='note',
+                                        visibility_level=int(request.POST.get('log_visibility')
+                                                             or visibility_level),
+                                        message=log_message)
             # 2. signal to obj
             if callable(getattr(obj, 'on_save_review', None)):
                 obj.on_save_review(reviews, log_message)
@@ -115,7 +121,7 @@ def save_review(request, organization, content_type, pk):
             redis.lpush(itemskey, json_str)
             redis.ltrim(itemskey, 0, QUEUE_SIZE)
             if log_message:
-                return JsonResponse({'id': newReviewLog.id, 'can_delete': can_delete})
+                return JsonResponse({'id': newReviewLog.id})
             else:
                 return HttpResponse("ok")
     return HttpResponse("nope!")
@@ -132,6 +138,8 @@ def get_review_history(request, organization):
     """
     redis = get_redis_connection(REDIS_CACHE_KEY)
     reviewskey = '{}_reviews'.format(organization)
+    visibility_level = ReviewGroup.user_visibility(organization, request.user)
+    vis_options = ReviewGroup.user_visibility_options(organization, request.user)
 
     # Check for user delete permissions to include in log
     can_delete = request.user.has_perm('reviewer.delete_reviewlog')
@@ -157,15 +165,17 @@ def get_review_history(request, organization):
             filters = Q(content_type_id=content_type_id,
                         object_id=int(pk))
             if subject:
-                filters = filters | Q(content_type_id=content_type_id,
-                                      subject=int(subject))
+                filters = filters | Q(subject=int(subject))
             review_logs = ReviewLog.objects.filter(
+                visibility_level__lte=visibility_level,
                 organization__slug=organization).filter(
                     filters).order_by('-id').values('reviewer__first_name',
                                                     'reviewer__last_name',
                                                     'message',
                                                     'created_at',
                                                     'object_id',
+                                                    'log_type',
+                                                    'visibility_level',
                                                     'id',
                                                 )
             logs.append({"pk": pk, 'type': content_type_id,
@@ -174,6 +184,8 @@ def get_review_history(request, organization):
                              'pk': r['object_id'], #for subject search broadening
                              'm': r['message'],
                              'ts': int(time.mktime(r['created_at'].timetuple())),
+                             't': r['log_type'],
+                             'v': r['visibility_level'],
                              'id': r['id'],
                          } for r in review_logs]})
     reviews = []
@@ -202,8 +214,11 @@ def get_review_history(request, organization):
             redis.hset(reviewskey, obj_key, json_str)
             reviews.append(json_str)
     return HttpResponse(
-        """{"reviews":[%s],"logs":%s, "can_delete":%s}""" %
-        (','.join(reviews), json.dumps(logs), json.dumps(can_delete)),
+        """{"reviews":[%s],"logs":%s, "can_delete":%s, "visibility": %s}""" %
+        (','.join(reviews),
+         json.dumps(logs),
+         json.dumps(can_delete),
+         json.dumps(list(vis_options.items()))),
         content_type='application/json')
 
 

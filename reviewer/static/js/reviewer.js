@@ -131,6 +131,7 @@ Reviewer.prototype = {
             }
           }
         }
+        self.visibility = data.visibility
         if (callback) {
           callback(pks, data);
         }
@@ -147,7 +148,7 @@ Reviewer.prototype = {
       }
     });
   },
-  saveReview: function(reviewSubject, selectMode, log, callback) {
+  saveReview: function(reviewSubject, selectMode, log, visibility, callback) {
     var opt = this.opt;
     var decisions = [];
     for (var i=0,l=opt.schema.length;i<l;i++) {
@@ -170,6 +171,7 @@ Reviewer.prototype = {
         pk: reviewSubject.pk,
         decisions: decisions.join(';'),
         log: log,
+        visibility: visibility,
         subject: reviewSubject.subject
       }
     }).then(function(data) {
@@ -261,7 +263,7 @@ Reviewer.prototype = {
           for (var pk in self.state) {
             if (pk in newFocus) {
               //dumbest, but easiest way to compare lists
-              if (newFocus[pk].toString() != self.state[pk].focus.toString()) {
+              if (String(newFocus[pk]) != String(self.state[pk].focus)) {
                 self.state[pk].focus = newFocus[pk];
                 self.renderFocusUpdate(self.state[pk]);
               }
@@ -322,13 +324,14 @@ Reviewer.prototype = {
             + '  <div class="col-md-10">'
             + (selectMode === 'multiselect' 
                 ? self.renderDecisionsMulti(this.opt.schema, reviewSubject)
-                : this.opt.schema.map(function(schema) {
-                      return self.renderDecisions(schema, reviewSubject)
-                   }).join('')
+                : this.opt.schema.map(
+                  (schema) => self.renderDecisions(schema, reviewSubject)
+                ).join('')
               )
-            + '    <div class="form-inline form-group">'
+            + '    <div class="form-inline form-group col-md-8">'
             + '      <label>Note </label> <input class="log form-control" type="text" />'
             + '    </div>'
+            + '<div class="col-md-4">'+ this.renderVisibility(this.visibility) + '</div>'
             + '  </div>'
             + '  <div class="review-header" style="padding-left:15px;">'
             + '      <button class="btn btn-default btn-primary save">Save</button>'
@@ -345,6 +348,18 @@ Reviewer.prototype = {
   },
   renderSaveUpdate: function(reviewSubject) {
     this.$('.saved', reviewSubject.o).html('saved!').show().fadeOut(2000);
+  },
+  renderVisibility: function(vis) {
+    vis = vis || this.visibility
+    if (vis && vis.length) {
+      return ('<div class="form-inline"><label>'
+              + '<span class="glyphicon glyphicon-eye-open" title="visibility: who can see it"></span> </label>'
+              + ' <select class="form-control visibility-select">'
+              + vis.map(
+                (v) => '<option value="'+encodeURIComponent(v[0])+'">'+v[1]+'</option>').join('')
+              + '</select></div>')
+    }
+    return ''
   },
   renderDeleteUndoAlert: function(reviewSubject, timeout, reviewObject, undo) {
     /*
@@ -401,7 +416,16 @@ Reviewer.prototype = {
       var other = isHostLog(log);
       var hue = 10*(parseInt(log.pk||0) % 36);
       const deleteButton = `<button class="btn btn-danger delete" data-id=${log.id} data-click="false"><span class="glyphicon glyphicon-trash"></span></button>`;
-
+      const typeIcon = (log.t === 'message'
+                        ? ('<span class="glyphicon glyphicon-envelope" '
+                           + ' style="padding:0 5px 0 5px" title="message"></span>')
+                        : (log.t === 'bulkmsg'
+                           ? ('<span class="glyphicon glyphicon-bullhorn" style="padding:0 5px 0 5px" '
+                              + ' title="bulk message"></span>')
+                           : (log.t === 'bulknote'
+                              ? ('<span class="glyphicon glyphicon-list-alt" style="padding:0 5px 0 5px" '
+                                 + ' title="bulk note"></span>')
+                              : '')))
       return (''
               + '<div class="logitem"'
               + ((other && log.pk) ? ' data-pk="'+log.pk+'" style="background-color: hsl('+hue+',17%,80%)"' : '')
@@ -409,7 +433,8 @@ Reviewer.prototype = {
               + ((other && log.pk) ? '-- ' : '')
               + '<span class="reviewer">' + log.r + '</span>'
               + ' (' + tsStr + '): '
-              + '<span class="logm">' + log.m + '</span>'
+              + typeIcon
+              + ' <span class="logm">' + log.m + '</span>'
               + `${this.state.canDelete ? deleteButton : ''}`
               + '</div>'
       );
@@ -525,6 +550,7 @@ Reviewer.prototype = {
         reviews[name] = val;
       });
       var log = $('input.log', reviewSubject.o).val().replace(/^\s+/,'').replace(/\s+$/,'');
+      var visibility = $('.visibility-select option:selected', reviewSubject.o).val();
       // 2. make sure something changed and if it did, update reviewSubject.data
       var changed = Boolean(log);
       for (var a in reviews) {
@@ -543,12 +569,14 @@ Reviewer.prototype = {
       }
       // 3. saveReview()
       if (changed) {
-        self.saveReview(reviewSubject, selectMode, log || undefined, function() {
-          // 4. on callback: add status (and clear log message)
-          self.renderSaveUpdate(reviewSubject);
-          self.renderLogUpdate(reviewSubject);
-          $('input.log', reviewSubject.o).val(''); //clear
-        });
+        self.saveReview(
+          reviewSubject, selectMode, log || undefined, visibility || undefined, 
+          function() {
+            // 4. on callback: add status (and clear log message)
+            self.renderSaveUpdate(reviewSubject);
+            self.renderLogUpdate(reviewSubject);
+            $('input.log', reviewSubject.o).val(''); //clear
+          });
       }
     });
     self.addDeleteListeners(reviewSubject);

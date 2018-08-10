@@ -12,7 +12,7 @@
     <link href="//netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap-glyphicons.css" rel="stylesheet">
 {% endblock %}
 
-{% block bodyclass %}{{ block.super }} app-{{ opts.app_label }} model-{{ opts.model_name }} bulk-message-send{% endblock %}
+{% block bodyclass %}{{ block.super }} app-{{ opts.app_label }} model-{{ opts.model_name }} {{action}}{% endblock %}
 
 {% block breadcrumbs %}
 <div class="breadcrumbs">
@@ -20,7 +20,7 @@
     <li><a href="{% url 'admin:index' %}">{% trans 'Home' %}</a></li>
     <li><a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a></li>
     <li><a href="{% url opts|admin_urlname:'changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a></li>
-    <li>{% trans 'Delete multiple objects' %}</li>
+    <li>{{action}}</li>
 </ol>
 </div>
 {% endblock %}
@@ -29,11 +29,11 @@
 
 {% if perms_lacking %}
     <p class="alert alert-danger">
-      Contact a site administrator about getting permission to bulk edit tags.
+      Contact a site administrator about getting permission to {{action}}.
     </p>
-{% elif count > max_send %}
+{% elif count > max_apply %}
     <p class="alert alert-danger">
-      The maximum number of people you can send to is {{max_send}}.  Your current selection is {{count}}.
+      The maximum number of people you can {{verb}} to is {{max_apply}}.  Your current selection is {{count}}.
       Please click back and select a lower number.
     </p>
 {% else %}
@@ -41,9 +41,18 @@
     <form method="post">{% csrf_token %}
 
     <div class="form-row clearfix">
-        
+        {% if visibility_options|length > 1 %}
+          {# need options and also more than one or we'll just default #}
+          <div class="form-group col-md-12">
+            <span class="glyphicon glyphicon-eye-open" title="visibility: who can see it?"></span>
+            <select name="visibility">
+              {% for visoption, visname in visibility_options %}
+              <option value="{{ visoption }}">{{visname}}</option>
+              {% endfor %}
+            </select>
+          </div>
+        {% endif %}
         <div class="form-group col-md-12">
-            <h4>Message</h4>
             <textarea name="message"></textarea>
         </div>
     </div>
@@ -52,10 +61,10 @@
             {% for obj in queryset %}
             <input type="hidden" name="{{ action_checkbox_name }}" value="{{ obj.pk|unlocalize }}" />
             {% endfor %}
-            <input type="hidden" name="action" value="bulk_message_send" />
+            <input type="hidden" name="action" value="{{action}}" />
             <input type="hidden" name="post" value="yes" />
             <ul class="list-inline">
-                <li class="list-inline-item"><input type="submit" class="default btn btn-success" value="Send to {{count}} {{count|pluralize:'person,people'}}" /></li>
+                <li class="list-inline-item"><input type="submit" class="default btn btn-success" value="{{ verb|title }} to {{count}} {{count|pluralize:'person,people'}}" /></li>
                 <li class="list-inline-item"><big><a href="#" class="button cancel-link">{% trans "No, take me back" %}</a></big></li>
             </ul>
         </div>

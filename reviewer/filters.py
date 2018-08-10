@@ -37,6 +37,11 @@ class ReviewerOrganizationFilter(SimpleListFilter):
             val = self.lookup_choices[0][0]
         return val
 
+    def visibility_options(self):
+        val = self.value()
+        if val:
+            ReviewGroup.objects.filter(pk=val).values_list('group__name', 'visibility_level')
+
     def get_slug(self):
         val = self.value()
         if val:
@@ -58,7 +63,6 @@ class ReviewerOrganizationFilter(SimpleListFilter):
     def lookups(self, request, model_admin):
         # we need this to save the right content type with the review api
         self.content_type = ContentType.objects.get_for_model(model_admin.model)
-        user = request.user
         return list(set(ReviewGroup.user_review_groups(request.user)
                         .exclude(organization__slug__endswith='hidden')
                         .values_list('organization_id', 'organization__title')))

@@ -15,7 +15,7 @@
 {% else %}
   {# chosen, or just one option #}
 <script>
-  var reviewState = (new Reviewer({organization: "{{spec.get_slug}}",
+  window.reviewState = (new Reviewer({organization: "{{spec.get_slug}}",
                                    schema: {{spec.review_schema_json|safe}},
                                    contentType: {{spec.content_type.id}},
                                    jQuery: window.jQuery || django.jQuery,
@@ -24,7 +24,7 @@
                                    selectMode: "{{spec.select_mode}}",
                                   }));
   (window.jQuery || django.jQuery)(function() {
-    setTimeout(reviewState.start, 0);
+    setTimeout(window.reviewState.start, 0);
   });
 </script>
 {% endif %}

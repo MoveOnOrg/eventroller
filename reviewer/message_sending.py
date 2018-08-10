@@ -1,9 +1,11 @@
+import json
 import random
 
 from django.core.mail import get_connection as get_mail_connection
 from django.conf import settings
 from django.conf.urls import url
 from django.contrib import admin
+from django.contrib.contenttypes.models import ContentType
 from django.core.mail import send_mail, EmailMultiAlternatives
 from django.http import HttpResponse
 from django.template.loader import render_to_string
@@ -11,7 +13,7 @@ from django.template.response import TemplateResponse
 from django.urls import reverse, NoReverseMatch
 from django.utils.safestring import mark_safe
 
-from reviewer.models import ReviewGroup
+from reviewer.models import ReviewGroup, ReviewLog
 
 class MessageSendingAdminMixin:
     """
@@ -32,6 +34,7 @@ class MessageSendingAdminMixin:
     * message_template: Customize the email content that goes out from the message and the object
     """
     send_a_message_placeholder = 'Send a message'
+    # something to track the organization, to send options for visibility
 
     def send_message_path(self):
         return '{app_label}_{model_name}_send_message'.format(
@@ -41,20 +44,39 @@ class MessageSendingAdminMixin:
     def get_urls(self):
         urls = admin.ModelAdmin.get_urls(self)
         my_urls = [
-            url('send_message/(?P<organization>[-.\w]+)/(?P<obj_id>[-.\w]+)/',
+            # must NOT end in a '/' or it will get matched with an admin
+            # blanket-match. See django.contrib.admin.options.ModelAdmin.get_urls
+            url('send_message/(?P<organization>[-.\w]+)/(?P<obj_id>[-.\w]+)',
                 self.admin_site.admin_view(self.send_message),
                 name=self.send_message_path())
         ]
         return urls + my_urls
 
+    def get_actions(self, request):
+        actions = admin.ModelAdmin.get_actions(self, request) or {}
+        if request.user.has_perm('reviewer.bulk_message_send'):
+            actions.update({'bulk_message_send': (
+                self.bulk_message_send,
+                'bulk_message_send',
+                'Send a message to many people')})
+        if request.user.has_perm('reviewer.bulk_note_add'):
+            actions.update({'bulk_note_add': (
+                self.bulk_note_add,
+                'bulk_note_add',
+                'Bulk add a note')})
+        return actions
+
     def send_message(self, request, organization, obj_id):
         result = 'failed to send'
         if not ReviewGroup.user_allowed(request.user, organization):
             result = 'permission denied'
-        elif request.method == 'POST' and self.message_send_ready():
+        elif request.method == 'POST' and self.message_send_ready(organization, request):
             obj = self.message_obj_lookup(obj_id, organization, request)
             if obj:
-                self.send_messages(request.POST.get('message',''), [obj])
+                self.deploy_messages(request.POST.get('message',''), [obj],
+                                     log_type='message',
+                                     visibility=request.POST.get('visibility'),
+                                     user=request.user)
                 result = 'success'
         response_json = json.dumps({'result': result})
         return HttpResponse(response_json, content_type='application/json')
@@ -76,39 +98,68 @@ class MessageSendingAdminMixin:
             'from_line': settings.FROM_EMAIL,
         }
 
-    def send_messages(self, message, objects, actually_send=True):
+    def deploy_messages(self, message, objects, log_type='message', visibility=None, user=None, actually_send=True):
         """
         1. create EmailMessage objects using template_func as an adapter/transformer to objects
         2. save message to object (in reviewlog or contactmessage thingie
         3. send the messages
         It will not check access control
         """
+        bulktypes = {'message': 'bulkmsg', 'note': 'bulknote'}
         messages = []
-        for obj in objects:
-            print(obj.id, obj)
-            message_dict = self.message_template(message, obj)
-            messages.append(create_message(**message_dict))
-        if actually_send:
-            connection = get_mail_connection()
-            connection.send_messages(messages)
-        else:
+        review_logs = []
+        if log_type == 'message':
+            for obj in objects:
+                print(obj.id, obj)
+                message_dict = self.message_template(message, obj)
+                messages.append(create_message(**message_dict))
+            if actually_send:
+                connection = get_mail_connection()
+                if hasattr(connection, 'open'):
+                    connection.open()
+                connection.send_messages(messages)
             print(messages) # TODO remove debug
-        # TODO: save messages into reviewlog or similar
-        return messages
+        # save messages into reviewlog or similar
+        if message and user:
+            msg_count = len(objects)
+            for obj in objects:
+                org = self.obj2org(obj)
+                subject_id = self.obj2subjectid(obj)
+                if visibility is None:
+                    visibility = ReviewGroup.user_visibility(org.slug, user)
+                review_logs.append(ReviewLog(content_type=ContentType.objects.get_for_model(obj._meta.model),
+                                             object_id=obj.id,
+                                             subject=subject_id,
+                                             organization_id=org.id,
+                                             reviewer=user,
+                                             log_type=log_type if msg_count == 1 else bulktypes.get(log_type),
+                                             visibility_level=int(visibility),
+                                             message=message))
+            if review_logs:
+                ReviewLog.objects.bulk_create(review_logs)
+        return (messages, review_logs)
 
-    def obj2orgslug(self, obj):
-        """How to get the organization slug from an object.  Override for a different way"""
-        return obj.organization.slug
+    def obj2org(self, obj):
+        """How to get the organization from an object.  Override for a different way"""
+        return obj.organization
+
+    def obj2subjectid(self, obj):
+        return None
+
+    def obj_person_noun(self):
+        return 'host'
 
     def send_message_widget(self, obj):
         try:
-            api_link = reverse('admin:'+self.send_message_path(), args=[self.obj2orgslug(obj), obj.id])
+            org = self.obj2org(obj)
+            api_link = reverse('admin:'+self.send_message_path(), args=[org.slug, obj.id])
             return mark_safe(
                 render_to_string(
                     'reviewer/message_send_widget.html',
                     {'obj_id':obj.pk,
                      'widget_id': random.randint(1,10000),
                      'placeholder': self.send_a_message_placeholder,
+                     'nounperson': self.obj_person_noun(),
                      'link': api_link}))
         except NoReverseMatch:
             return ''
@@ -116,23 +167,55 @@ class MessageSendingAdminMixin:
     send_message_widget.allow_tags = True
 
     @staticmethod
+    def bulk_note_add(modeladmin, request, queryset):
+        return MessageSendingAdminMixin.bulk_content_action(
+            modeladmin, request, queryset,
+            log_type='note',
+            action='bulk_note_add',
+            verb='add note')
+
+    @staticmethod
     def bulk_message_send(modeladmin, request, queryset):
+        return MessageSendingAdminMixin.bulk_content_action(
+            modeladmin, request, queryset,
+            log_type='message',
+            action='bulk_message_send',
+            verb='send a message')
+
+    @staticmethod
+    def bulk_content_action(modeladmin, request, queryset, log_type, action, verb):
         """
         Message sending action for a ModelAdmin that will send messages to everyone
         chosen in a queryset
         """
-        title = "Send a message to many at once"
+        title = "{} to many at once".format(verb)
         objects_name = "tags"
         opts = modeladmin.model._meta
         action_checkbox_name="_selected_action"
         app_label = opts.app_label
-        perms_needed = False # TODO: set permissions
+        perms_needed = not request.user.has_perm('reviewer.{}'.format(action))
         count = queryset.count()
-        max_send = getattr(settings, "MESSAGE_SEND_MAX", 200)
-        if not perms_needed and count <= max_send:
+        max_apply = getattr(settings, "BULK_NOTEMESSAGE_MAX", 200)
+
+        organization_slug = request.POST.get('organization')
+        if not organization_slug:
+            orgslugs = (ReviewGroup
+                        .user_review_groups(request.user)
+                        .values_list('organization__slug', flat=True)
+                        .distinct())
+            if len(orgslugs) == 1:
+                organization_slug = orgslugs[0]
+
+        if not perms_needed and count and count <= max_apply:
             message = request.POST.get('message','')
             if message and request.POST.get('post'):
-                modeladmin.send_messages(message, list(queryset))
+                visibility = request.POST.get('visibility')
+                if visibility is None:
+                    visibility = ReviewGroup.user_visibility(organization_slug, request.user)
+                modeladmin.deploy_messages(message, list(queryset),
+                                           log_type=log_type,
+                                           visibility=visibility,
+                                           user=request.user)
                 # Return None to display the change list page again.
                 return None
         else:
@@ -141,20 +224,26 @@ class MessageSendingAdminMixin:
         context = dict(
             modeladmin.admin_site.each_context(request),
             title=title,
+            organization_slug=organization_slug,
+            visibility_options=(
+                ReviewGroup.user_visibility_options(organization_slug, request.user).items()
+                if organization_slug else None),
             objects_name=objects_name,
             queryset=queryset,
             count=count,
-            max_send=max_send,
+            max_apply=max_apply,
             perms_lacking=perms_needed,
             opts=opts,
             action_checkbox_name=action_checkbox_name,
-            media=modeladmin.media
+            media=modeladmin.media,
+            verb=verb,
+            action=action
         )
 
         request.current_app = modeladmin.admin_site.name
 
         # Display the confirmation page
-        return TemplateResponse(request, "reviewer/admin/bulk_message_send.html", context)
+        return TemplateResponse(request, "reviewer/admin/bulk_content_action.html", context)
 
     
 def create_message(to=None, subject=None, message_text=None, message_html='',
