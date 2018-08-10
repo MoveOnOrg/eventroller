@@ -219,7 +219,7 @@ class EventAdmin(MessageSendingAdminMixin, admin.ModelAdmin, EventDisplayAdminMi
 
     ## BEGIN EventAdmin Message Sending
     send_a_message_placeholder = 'Optional message to host. Email will include a link to manage the event.'
-    def message_template(self, message, event):
+    def message_template(self, message, event, user=None):
         """
         NOTE: This takes a while to render, almost entirely because
           get_host_event_link needs to get a login token by AK API, which takes some time.

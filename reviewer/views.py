@@ -92,6 +92,7 @@ def save_review(request, organization, content_type, pk):
                 reviews = [Review.objects.create(content_type=ct, object_id=obj.id,
                                                  organization_id=org[0].organization_id,
                                                  reviewer=request.user,
+                                                 # NOTE: we don't use vis on Reviews yet
                                                  visibility_level=int(visibility_level),
                                                  key=k, decision=decision)
                            for k, decision in decisions]
@@ -162,22 +163,28 @@ def get_review_history(request, organization):
             if not pk:
                 continue
             subject = subjects.get(pk)
-            filters = Q(content_type_id=content_type_id,
-                        object_id=int(pk))
+            contentfilters = Q(content_type_id=content_type_id,
+                               object_id=int(pk))
             if subject:
-                filters = filters | Q(subject=int(subject))
-            review_logs = ReviewLog.objects.filter(
-                visibility_level__lte=visibility_level,
-                organization__slug=organization).filter(
-                    filters).order_by('-id').values('reviewer__first_name',
-                                                    'reviewer__last_name',
-                                                    'message',
-                                                    'created_at',
-                                                    'object_id',
-                                                    'log_type',
-                                                    'visibility_level',
-                                                    'id',
-                                                )
+                contentfilters = contentfilters | Q(subject=int(subject))
+            visibilityfilters = None
+            if visibility_level == 0:
+                visibilityfilters = Q(reviewer=request.user, visibility_level=0)
+            else:
+                visibilityfilters = Q(visibility_level__lte=visibility_level)
+            review_logs = (ReviewLog.objects
+                           .filter(organization__slug=organization)
+                           .filter(contentfilters)
+                           .filter(visibilityfilters)
+                           .order_by('-id').values('reviewer__first_name',
+                                                   'reviewer__last_name',
+                                                   'message',
+                                                   'created_at',
+                                                   'object_id',
+                                                   'log_type',
+                                                   'visibility_level',
+                                                   'id',
+                                               ))
             logs.append({"pk": pk, 'type': content_type_id,
                          "m": [{
                              'r': '{} {}'.format(r['reviewer__first_name'],r['reviewer__last_name'][:1]),

@@ -27,9 +27,9 @@
 
 {% block content %}
 
-{% if perms_lacking %}
+{% if no_continue_message %}
     <p class="alert alert-danger">
-      Contact a site administrator about getting permission to {{action}}.
+      {{no_continue_message}}
     </p>
 {% elif count > max_apply %}
     <p class="alert alert-danger">
