@@ -328,10 +328,10 @@ Reviewer.prototype = {
                   (schema) => self.renderDecisions(schema, reviewSubject)
                 ).join('')
               )
-            + '    <div class="form-inline form-group">'
+            + '    <div class="form-inline form-group col-md-8">'
             + '      <label>Note </label> <input class="log form-control" type="text" />'
-            + this.renderVisibility(this.visibility)
             + '    </div>'
+            + '<div class="col-md-4">'+ this.renderVisibility(this.visibility) + '</div>'
             + '  </div>'
             + '  <div class="review-header" style="padding-left:15px;">'
             + '      <button class="btn btn-default btn-primary save">Save</button>'
@@ -352,7 +352,8 @@ Reviewer.prototype = {
   renderVisibility: function(vis) {
     vis = vis || this.visibility
     if (vis && vis.length) {
-      return ('<div class="form-inline"><label><span class="glyphicon glyphicon-eye-open"></span></label>'
+      return ('<div class="form-inline"><label>'
+              + '<span class="glyphicon glyphicon-eye-open" title="visibility: who can see it"></span> </label>'
               + ' <select class="form-control">'
               + vis.map(
                 (v) => '<option value="'+encodeURIComponent(v[0])+'">'+v[1]+'</option>').join('')
