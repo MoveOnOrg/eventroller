@@ -125,7 +125,8 @@ class Review(models.Model):
                    key=key,
                    decision=decision,
                    object_id=obj_id,
-                   content_type=content_type)
+                   content_type=content_type,
+                   visibility_level=10) # hard-coded: everyone can see all tags
             for obj_id in obj_ids
         ])
         cls.bulk_clear_review_cache(obj_ids, content_type.id, organization)
