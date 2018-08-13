@@ -1,3 +1,4 @@
+import datetime
 import json
 import random
 
@@ -68,7 +69,8 @@ class MessageSendingAdminMixin:
 
     def send_message(self, request, organization, obj_id):
         result = 'failed to send'
-        if not ReviewGroup.user_allowed(request.user, organization):
+        if not ReviewGroup.user_allowed(request.user, organization)\
+           or not request.user.has_perm('reviewer.message_sending'):
             result = 'permission denied'
         elif request.method == 'POST' and self.message_send_ready(organization, request):
             obj = self.message_obj_lookup(obj_id, organization, request)
@@ -90,7 +92,7 @@ class MessageSendingAdminMixin:
         """
         return self.model.objects.filter(pk=obj_id).first()
 
-    def message_template(self, message, obj):
+    def message_template(self, message, obj, user=None):
         return {
             'to': obj.email,
             'subject': 'Message about {}'.format(str(obj)), # TODO? should we make it a setting?
@@ -108,17 +110,15 @@ class MessageSendingAdminMixin:
         bulktypes = {'message': 'bulkmsg', 'note': 'bulknote'}
         messages = []
         review_logs = []
-        if log_type == 'message':
+        if log_type in ('message', 'bulkmsg'):
             for obj in objects:
-                print(obj.id, obj)
-                message_dict = self.message_template(message, obj)
+                message_dict = self.message_template(message, obj, user)
                 messages.append(create_message(**message_dict))
             if actually_send:
                 connection = get_mail_connection()
                 if hasattr(connection, 'open'):
                     connection.open()
                 connection.send_messages(messages)
-            print(messages) # TODO remove debug
         # save messages into reviewlog or similar
         if message and user:
             msg_count = len(objects)
@@ -132,7 +132,8 @@ class MessageSendingAdminMixin:
                                              subject=subject_id,
                                              organization_id=org.id,
                                              reviewer=user,
-                                             log_type=log_type if msg_count == 1 else bulktypes.get(log_type),
+                                             log_type=(log_type if msg_count == 1
+                                                       else bulktypes.get(log_type, log_type)),
                                              visibility_level=int(visibility),
                                              message=message))
             if review_logs:
@@ -193,7 +194,10 @@ class MessageSendingAdminMixin:
         opts = modeladmin.model._meta
         action_checkbox_name="_selected_action"
         app_label = opts.app_label
+        no_continue_message = ''
         perms_needed = not request.user.has_perm('reviewer.{}'.format(action))
+        if perms_needed:
+            no_continue_message = 'Contact a site administrator about getting permission to {}.'.format(action)
         count = queryset.count()
         max_apply = getattr(settings, "BULK_NOTEMESSAGE_MAX", 200)
 
@@ -205,6 +209,19 @@ class MessageSendingAdminMixin:
                         .distinct())
             if len(orgslugs) == 1:
                 organization_slug = orgslugs[0]
+
+        if log_type in ('message', 'bulkmsg'):
+            howmany = ReviewLog.objects.filter(reviewer=request.user,
+                                               log_type__in=('message', 'bulkmsg'))
+            curtime = datetime.datetime.now()
+            weekcount = howmany.filter(created_at__gte=curtime-datetime.timedelta(days=7)).count()
+            daycount = howmany.filter(created_at__gte=curtime-datetime.timedelta(days=1)).count()
+            max_daycount = getattr(settings, 'BULK_NOTEMESSAGE_DAY_MAX', 200)
+            max_weekcount = getattr(settings, 'BULK_NOTEMESSAGE_WEEK_MAX', 200)
+            if (daycount + count) > max_daycount:
+                no_continue_message = 'This exceeds your daily contact count of {}.'.format(max_daycount)
+            elif (weekcount + count) > max_weekcount:
+                no_continue_message = 'This exceeds your weekly contact count of {}.'.format(max_weekcount)
 
         if not perms_needed and count and count <= max_apply:
             message = request.POST.get('message','')
@@ -233,6 +250,7 @@ class MessageSendingAdminMixin:
             count=count,
             max_apply=max_apply,
             perms_lacking=perms_needed,
+            no_continue_message=no_continue_message,
             opts=opts,
             action_checkbox_name=action_checkbox_name,
             media=modeladmin.media,
