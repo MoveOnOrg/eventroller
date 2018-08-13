@@ -153,7 +153,7 @@ Reviewer.prototype = {
     var opt = this.opt;
     var decisions = [];
     if (opt.contentTypeModel == "coreuser") {
-      visibility = 10;
+      visibility = 10; // hard-coded tags visibility so all can see them
     }
     for (var i=0,l=opt.schema.length;i<l;i++) {
       var name = opt.schema[i].name;
