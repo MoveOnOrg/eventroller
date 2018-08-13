@@ -18,6 +18,7 @@
   window.reviewState = (new Reviewer({organization: "{{spec.get_slug}}",
                                    schema: {{spec.review_schema_json|safe}},
                                    contentType: {{spec.content_type.id}},
+                                   contentTypeModel: "{{spec.content_type.model}}",
                                    jQuery: window.jQuery || django.jQuery,
                                    pollRate: {{spec.poll_rate}},
                                    apiPath: "{{spec.get_path}}",

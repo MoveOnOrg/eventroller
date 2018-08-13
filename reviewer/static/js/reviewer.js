@@ -24,6 +24,7 @@ function Reviewer(opts) {
     jQuery: window.jQuery,
     organization: null,
     contentType: null,
+    contentTypeModel: null,
     apiPath: '/review',
     cssSelector: '.review', //expects data-pk and data-type
     pollRate: 15, //number of seconds between polling for updates (0 means never)
@@ -151,6 +152,9 @@ Reviewer.prototype = {
   saveReview: function(reviewSubject, selectMode, log, visibility, callback) {
     var opt = this.opt;
     var decisions = [];
+    if (opt.contentTypeModel == "coreuser") {
+      visibility = 10;
+    }
     for (var i=0,l=opt.schema.length;i<l;i++) {
       var name = opt.schema[i].name;
       if (selectMode === 'multiselect' && Object.keys(reviewSubject.data).length === 0) {
