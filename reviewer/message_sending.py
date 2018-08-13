@@ -211,8 +211,8 @@ class MessageSendingAdminMixin:
                 organization_slug = orgslugs[0]
 
         if log_type in ('message', 'bulkmsg'):
-            howmany = ReviewLog.objects.filter(reviwer=request.user,
-                                     log_type__in=('message', 'bulkmsg'))
+            howmany = ReviewLog.objects.filter(reviewer=request.user,
+                                               log_type__in=('message', 'bulkmsg'))
             curtime = datetime.datetime.now()
             weekcount = howmany.filter(created_at__gte=curtime-datetime.timedelta(days=7)).count()
             daycount = howmany.filter(created_at__gte=curtime-datetime.timedelta(days=1)).count()
