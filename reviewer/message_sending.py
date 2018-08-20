@@ -219,9 +219,11 @@ class MessageSendingAdminMixin:
             max_daycount = getattr(settings, 'BULK_NOTEMESSAGE_DAY_MAX', 200)
             max_weekcount = getattr(settings, 'BULK_NOTEMESSAGE_WEEK_MAX', 200)
             if (daycount + count) > max_daycount:
-                no_continue_message = 'This exceeds your daily contact count of {}.'.format(max_daycount)
+                no_continue_message = 'This exceeds your daily contact limit of {}.'.format(max_daycount)
             elif (weekcount + count) > max_weekcount:
-                no_continue_message = 'This exceeds your weekly contact count of {}.'.format(max_weekcount)
+                no_continue_message = 'This exceeds your weekly contact limit of {}.'.format(max_weekcount)
+            elif count > max_apply:
+                no_continue_message = 'This exceeds your per-send contact limit of {}.'.format(max_apply)
 
         if not perms_needed and count and count <= max_apply:
             message = request.POST.get('message','')
