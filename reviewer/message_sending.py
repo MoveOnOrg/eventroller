@@ -95,9 +95,10 @@ class MessageSendingAdminMixin:
     def message_template(self, message, obj, user=None):
         return {
             'to': obj.email,
-            'subject': 'Message about {}'.format(str(obj)), # TODO? should we make it a setting?
+            'subject': getattr(settings, 'EMAIL_SUBJECT', 'A message from MoveOn'),
             'message_text': message, # TODO? wrap in minimal template?
-            'from_line': settings.FROM_EMAIL,
+            'from_line': '{} {}., MoveOn {}'.format(user.first_name, user.last_name[:1], settings.FROM_EMAIL),
+            'reply_to': user.email
         }
 
     def deploy_messages(self, message, objects, log_type='message', visibility=None, user=None, actually_send=True):
