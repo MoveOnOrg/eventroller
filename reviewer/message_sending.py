@@ -93,6 +93,14 @@ class MessageSendingAdminMixin:
         return self.model.objects.filter(pk=obj_id).first()
 
     def message_template(self, message, obj, user=None):
+        message_txt = render_to_string(
+            'reviewer/message_to_member.html',
+            {'header': getattr(settings, 'EMAIL_HEADER', ''),
+             'message': message,
+             'footer': getattr(settings, 'EMAIL_FOOTER','')
+            }
+        )
+
         return {
             'to': obj.email,
             'subject': getattr(settings, 'EMAIL_SUBJECT', 'A message from MoveOn'),

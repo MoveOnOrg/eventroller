@@ -1,0 +1,15 @@
+{% autoescape off %}
+
+{{header}}
+
+{{message}}
+
+{{footer}}
+
+{% comment %}
+NOTE that autoescape is off here -- that is because
+it is sent as TEXT in the email, and:
+1. We don't want to escape things like apostrophes
+2. no html should be interpreted by mail clients
+{% endcomment %}
+{% endautoescape %}
