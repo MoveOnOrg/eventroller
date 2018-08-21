@@ -156,7 +156,7 @@ Reviewer.prototype = {
       if (selectMode === 'multiselect' && Object.keys(reviewSubject.data).length === 0) {
         // handle case in tag multiselect where all tags are removed
         decisions.push(name + ':' + '');
-      } else if (name in reviewSubject.data) { 
+      } else if (name in reviewSubject.data) {
         // reviewSubject.data gets updated in postRender save button listener
         decisions.push(name + ':' + reviewSubject.data[name]);
       }
@@ -309,7 +309,7 @@ Reviewer.prototype = {
     for (var i=0,l=pks.length; i<l; i++) {
       var reviewSubject = this.state[pks[i]];
       if (reviewSubject.o && reviewSubject.data) {
-        reviewSubject.o.innerHTML = this.render(reviewSubject, this.opt.selectMode); 
+        reviewSubject.o.innerHTML = this.render(reviewSubject, this.opt.selectMode);
         this.postRender(reviewSubject, this.opt.selectMode);
       }
     }
@@ -322,7 +322,7 @@ Reviewer.prototype = {
             + '<div class="review-widget">'
             + ' <div class="row">'
             + '  <div class="col-md-10">'
-            + (selectMode === 'multiselect' 
+            + (selectMode === 'multiselect'
                 ? self.renderDecisionsMulti(this.opt.schema, reviewSubject)
                 : this.opt.schema.map(
                   (schema) => self.renderDecisions(schema, reviewSubject)
@@ -497,9 +497,9 @@ Reviewer.prototype = {
           + tag_data[key].map(function(o){
             return (''
               + '          <option ' + ((reviewSubject.data[o.id])?'selected="selected"':'')
-              + ' value="' + o['record'] + '" data-name="' + o['id'] + '">' 
+              + ' value="' + o['record'] + '" data-name="' + o['id'] + '">'
               + o['display'] + '</option>'
-            )        
+            )
           }).join('')
           + '        </optgroup>'
         )
@@ -570,7 +570,7 @@ Reviewer.prototype = {
       // 3. saveReview()
       if (changed) {
         self.saveReview(
-          reviewSubject, selectMode, log || undefined, visibility || undefined, 
+          reviewSubject, selectMode, log || undefined, visibility || undefined,
           function() {
             // 4. on callback: add status (and clear log message)
             self.renderSaveUpdate(reviewSubject);
