@@ -97,7 +97,7 @@ class MessageSendingAdminMixin:
             'to': obj.email,
             'subject': getattr(settings, 'EMAIL_SUBJECT', 'A message from MoveOn'),
             'message_text': message, # TODO? wrap in minimal template?
-            'from_line': '{} {}., MoveOn {}'.format(user.first_name, user.last_name[:1], settings.FROM_EMAIL),
+            'from_line': "{} {}.\, from MoveOn {}".format(user.first_name, user.last_name[:1], settings.FROM_EMAIL),
             'reply_to': user.email
         }
 
