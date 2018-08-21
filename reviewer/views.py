@@ -8,6 +8,7 @@ from django.db.models import Q
 from django.http import HttpResponse, HttpResponseForbidden, Http404, JsonResponse
 from django.shortcuts import render, get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
+from django.utils import timezone
 
 from django_redis import get_redis_connection
 
@@ -80,15 +81,25 @@ def save_review(request, organization, content_type, pk):
             obj = ct.model_class().objects.get(pk=pk)
             decisions = []
             reviews = []
+
+            # If the decisions string comes empty, obsolete everything
+            if not decisions_str:
+                (Review.objects.filter(content_type=ct,
+                                       obsoleted_at__isnull=True,
+                                       object_id=obj.id,
+                                       organization_id=org[0].organization_id
+                                       )
+                    .update(obsoleted_at=timezone.now()))
+
             # If there are no tags sent, we might still save a log message
             if len(decisions_str) >= 3 and ':' in decisions_str:
                 decisions = [d[:257].split(':') for d in decisions_str.split(';')]
                 # 1. save to database
-                deleted_res = (Review.objects.filter(content_type=ct,
-                                                     object_id=obj.id,
-                                                     key__in=[k for k, d in decisions],
-                                                     organization_id=org[0].organization_id)
-                               .update(obsoleted_at=datetime.datetime.now()))
+                (Review.objects.filter(content_type=ct,
+                                       object_id=obj.id,
+                                       organization_id=org[0].organization_id)
+                    .exclude(key__in=[k for k, d in decisions])
+                    .update(obsoleted_at=timezone.now()))
                 reviews = [Review.objects.create(content_type=ct, object_id=obj.id,
                                                  organization_id=org[0].organization_id,
                                                  reviewer=request.user,

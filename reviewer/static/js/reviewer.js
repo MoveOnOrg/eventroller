@@ -229,7 +229,7 @@ Reviewer.prototype = {
   },
   handleUndelete: function(reviewSubject, reviewObject) {
     reviewSubject.log.unshift(reviewObject);
-    if (reviewSubject.log.length > 1 && reviewSubject.log[1].id > reviewObject.id) {
+    if (reviewSubject.log[1].id > reviewObject.id) {
       reviewSubject.log = reviewSubject.log.sort((a, b) => ( b.id - a.id ));
     }
   },
