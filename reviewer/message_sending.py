@@ -182,7 +182,7 @@ class MessageSendingAdminMixin:
             modeladmin, request, queryset,
             log_type='note',
             action='bulk_note_add',
-            verb='add note')
+            verb='Add note')
 
     @staticmethod
     def bulk_message_send(modeladmin, request, queryset):
@@ -190,7 +190,7 @@ class MessageSendingAdminMixin:
             modeladmin, request, queryset,
             log_type='message',
             action='bulk_message_send',
-            verb='send a message')
+            verb='Send a message')
 
     @staticmethod
     def bulk_content_action(modeladmin, request, queryset, log_type, action, verb):
@@ -198,7 +198,7 @@ class MessageSendingAdminMixin:
         Message sending action for a ModelAdmin that will send messages to everyone
         chosen in a queryset
         """
-        title = "{} to many at once".format(verb)
+        title = "{} to many people".format(verb)
         objects_name = "tags"
         opts = modeladmin.model._meta
         action_checkbox_name="_selected_action"
@@ -266,7 +266,8 @@ class MessageSendingAdminMixin:
             action_checkbox_name=action_checkbox_name,
             media=modeladmin.media,
             verb=verb,
-            action=action
+            action=action,
+            breadcrumb='Bulk Message Send' if action == 'bulk_message_send' else 'Bulk Note Add'
         )
 
         request.current_app = modeladmin.admin_site.name
@@ -274,7 +275,7 @@ class MessageSendingAdminMixin:
         # Display the confirmation page
         return TemplateResponse(request, "reviewer/admin/bulk_content_action.html", context)
 
-    
+
 def create_message(to=None, subject=None, message_text=None, message_html='',
                    from_line=None, from_name=None, from_email=None,
                    reply_to=None, headers=None,

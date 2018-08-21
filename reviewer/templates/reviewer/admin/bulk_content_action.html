@@ -2,14 +2,9 @@
 {% load i18n l10n admin_urls static %}
 
 {% block extrahead %}
+    {{ block.super }}
     {{ media }}
     <script type="text/javascript" src="{% static 'admin/js/cancel.js' %}"></script>
-    <link rel="stylesheet" type="text/css" href="/static/css/site.css" />
-
-    <link rel="apple-touch-icon" href="//s3.amazonaws.com/s3.moveon.org/images/with_dims/moveon_iphone_icon_57x57.png"/>
-    <link rel="shortcut icon" href="//s3.amazonaws.com/s3.moveon.org/favicon.ico" />
-    <link href="//s3.amazonaws.com/actionkit.moveon.org/static/stylesheets/site.css" rel="stylesheet">
-    <link href="//netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap-glyphicons.css" rel="stylesheet">
 {% endblock %}
 
 {% block bodyclass %}{{ block.super }} app-{{ opts.app_label }} model-{{ opts.model_name }} {{action}}{% endblock %}
@@ -20,7 +15,7 @@
     <li><a href="{% url 'admin:index' %}">{% trans 'Home' %}</a></li>
     <li><a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a></li>
     <li><a href="{% url opts|admin_urlname:'changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a></li>
-    <li>{{action}}</li>
+    <li>{{breadcrumb}}</li>
 </ol>
 </div>
 {% endblock %}
@@ -70,7 +65,7 @@
         </div>
     </div>
 
-  
+
     </form>
 {% endif %}
 {% endblock %}
