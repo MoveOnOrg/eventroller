@@ -21,24 +21,28 @@ $('#send-message--{{obj_id}}--w{{widget_id|default:0}}').click(function(evt) {
 
 $('#send-message-status--{{obj_id}}--w{{widget_id|default:0}} button').click(function(evt) {
   evt.preventDefault();
-  var $link = $('#send-message--{{obj_id}}--w{{widget_id|default:0}}');
-  var $status = $('#send-message-status--{{obj_id}}--w{{widget_id|default:0}}');
-  $(this).addClass('hidden');
-  var $msgSpan = $('span.js--status', $status)
-    .text('Sending ...')
-    .attr('class', 'label label-warning');
-  var visibility = $('.js--visibility option:selected', $status).val()
-  $.ajax({"method": "POST",
-          "url": $link.attr('href'),
-          "data": {
-            'message': $('textarea', $status).val(),
-            'csrfmiddlewaretoken': $('input[name=csrfmiddlewaretoken]').val(),
-            'visibility': visibility || undefined
-          }
-         })
-    .then(function success(data) {
-      console.log(data);
-      console.log(data.result);
+
+  legal_message =   "WARNING: Messages can only pertain to federal House and Senate "
+                  + "campaigns. Do not refer to gubernatorial or any other "
+                  + "downballot campaigns in your message."
+                  + "\n\nPress OK to confirm that your message complies with the above."
+
+  if (confirm(legal_message)) {
+    var $link = $('#send-message--{{obj_id}}--w{{widget_id|default:0}}');
+    var $status = $('#send-message-status--{{obj_id}}--w{{widget_id|default:0}}');
+    $(this).addClass('hidden');
+    var $msgSpan = $('span.js--status', $status)
+      .text('Sending ...')
+      .attr('class', 'label label-warning');
+    var visibility = $('.js--visibility option:selected', $status).val()
+    $.ajax({"method": "POST",
+      "url": $link.attr('href'),
+      "data": {
+        'message': $('textarea', $status).val(),
+        'csrfmiddlewaretoken': $('input[name=csrfmiddlewaretoken]').val(),
+        'visibility': visibility || undefined
+      }
+    }).then(function success(data) {
       if (data.result == 'success') {
         $msgSpan
           .text('Sent')
@@ -53,6 +57,7 @@ $('#send-message-status--{{obj_id}}--w{{widget_id|default:0}} button').click(fun
         .text('Error')
         .attr('class', 'label label-danger');
     });
-  return false;
+    return false;
+  }
 });
 </script>
