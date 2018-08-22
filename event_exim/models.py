@@ -12,9 +12,6 @@ from django.db.models import Count
 
 from event_store.models import Activist, Event, Organization
 from event_exim import connectors
-from event_review.admin import event_list_display
-
-
 
 CRM_TYPES = {
     #'actionkit_db': lambda: connectors.ActionKitDBWrapper,
@@ -243,14 +240,6 @@ class EventDupeGuesses(models.Model):
     class Meta:
         unique_together = (('source_event','dupe_event'),)
   
-    def source_event_list_display(self):
-        return event_list_display(self.source_event, onecol=True)
-    source_event_list_display.short_description = "Original Event"
-
-    def dupe_event_list_display(self):
-        return event_list_display(self.dupe_event, onecol=True)
-    dupe_event_list_display.short_description = 'Duplicate Event'
-    
     @staticmethod
     def get_potential_dupes():
         """

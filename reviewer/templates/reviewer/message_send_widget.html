@@ -1,0 +1,63 @@
+<a id="send-message--{{obj_id}}--w{{widget_id|default:0}}" href="{{link|safe}}" >Send message to {{ nounperson|default:"host" }}</a>
+<div id="send-message-status--{{obj_id}}--w{{widget_id|default:0}}" class="hidden">
+  <b style="vertical-align:top">Message:</b>
+  <div class="js--visibility"></div>
+  <textarea rows="2" style="min-width: 50%;" placeholder="{{placeholder}}"></textarea>
+  <button class="btn btn-sm" style="vertical-align:top">Send</button>
+  <span class="js--status"></span>
+</div>
+<script>
+$('#send-message--{{obj_id}}--w{{widget_id|default:0}}').click(function(evt) {
+    var $link = $('#send-message--{{obj_id}}--w{{widget_id|default:0}}');
+    var $status = $('#send-message-status--{{obj_id}}--w{{widget_id|default:0}}');
+    if (window.reviewState && window.reviewState.visibility) {
+      $('.js--visibility', $status).html(window.reviewState.renderVisibility())
+    }
+    $status.removeClass('hidden');
+    $('button', $status).removeClass('hidden');
+    evt.preventDefault();
+    return false;
+});
+
+$('#send-message-status--{{obj_id}}--w{{widget_id|default:0}} button').click(function(evt) {
+  evt.preventDefault();
+
+  legal_message =   "WARNING: Messages can only pertain to federal House and Senate "
+                  + "campaigns. Do not refer to gubernatorial or any other "
+                  + "downballot campaigns in your message."
+                  + "\n\nPress OK to confirm that your message complies with the above."
+
+  if (confirm(legal_message)) {
+    var $link = $('#send-message--{{obj_id}}--w{{widget_id|default:0}}');
+    var $status = $('#send-message-status--{{obj_id}}--w{{widget_id|default:0}}');
+    $(this).addClass('hidden');
+    var $msgSpan = $('span.js--status', $status)
+      .text('Sending ...')
+      .attr('class', 'label label-warning');
+    var visibility = $('.js--visibility option:selected', $status).val()
+    $.ajax({"method": "POST",
+      "url": $link.attr('href'),
+      "data": {
+        'message': $('textarea', $status).val(),
+        'csrfmiddlewaretoken': $('input[name=csrfmiddlewaretoken]').val(),
+        'visibility': visibility || undefined
+      }
+    }).then(function success(data) {
+      if (data.result == 'success') {
+        $msgSpan
+          .text('Sent')
+          .attr('class', 'label label-success');
+      } else {
+        $msgSpan
+          .text('Error: ' + data.result)
+          .attr('class', 'label label-danger');
+      }
+    }, function error(data) {
+      $msgSpan
+        .text('Error')
+        .attr('class', 'label label-danger');
+    });
+    return false;
+  }
+});
+</script>

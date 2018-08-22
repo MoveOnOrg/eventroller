@@ -5,9 +5,10 @@ import time
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.db.models import Q
-from django.http import HttpResponse, HttpResponseForbidden, Http404
+from django.http import HttpResponse, HttpResponseForbidden, Http404, JsonResponse
 from django.shortcuts import render, get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
+from django.utils import timezone
 
 from django_redis import get_redis_connection
 
@@ -37,24 +38,23 @@ FOCUS_MAX = getattr(settings, 'REVIEWER_FOCUS_MAX', 30)
 # queue_size should probably be less than focus_max
 QUEUE_SIZE = getattr(settings, 'REVIEWER_QUEUE_SIZE', 12)
 
+
 def reviewgroup_auth(view_func):
     """
     Confirms that user is in a ReviewGroup of the appropriate organization.
     Note: Assumes that `organization` is the first view parameter (after request)
     """
     def wrapped(request, organization, *args, **kw):
-        allowed = ReviewGroup.org_groups(organization)
-        allowed_groups = set([x.group_id for x in allowed])
-        group_ids = set(request.user.groups.values_list('id', flat=True))
-        if not group_ids.intersection(allowed_groups) \
-           and not request.user.is_superuser:
-            return HttpResponseForbidden('nope')
-        return view_func(request, organization, *args, **kw)
+        if ReviewGroup.user_allowed(request.user, organization):
+            return view_func(request, organization, *args, **kw)
+        return HttpResponseForbidden('nope')
     return wrapped
+
 
 @reviewgroup_auth
 def base(request):
     return HttpResponse("ok")
+
 
 @reviewgroup_auth
 def save_review(request, organization, content_type, pk):
@@ -68,33 +68,56 @@ def save_review(request, organization, content_type, pk):
         decisions_str = request.POST.get('decisions', '')
         log_message = request.POST.get('log')
         subject = request.POST.get('subject')
-        if content_type and pk and len(decisions_str) >= 3\
-           and ':' in decisions_str:
+        visibility_level = request.POST.get('visibility')
+        if visibility_level is None:
+            # the user's max visibility level for the org
+            visibility_level = ReviewGroup.user_visibility(organization, request.user)
+
+        if content_type and pk:
             org = ReviewGroup.org_groups(organization)
             ct = ContentType.objects.get_for_id(int(content_type))
             # make sure the object exists
             # ct.get_object_for_this_type fails to cross db boundaries
             obj = ct.model_class().objects.get(pk=pk)
-            decisions = [d[:257].split(':') for d in decisions_str.split(';')]
-            # 1. save to database
-            deleted_res = (Review.objects.filter(content_type=ct,
-                                                 object_id=obj.id,
-                                                 organization_id=org[0].organization_id)
-                           .delete())
-            reviews = [Review.objects.create(content_type=ct, object_id=obj.id,
-                                             organization_id=org[0].organization_id,
-                                             reviewer=request.user,
-                                             key=k, decision=decision)
-                       for k, decision in decisions
-                       if decision]
+            decisions = []
+            reviews = []
+
+            # If the decisions string comes empty, obsolete everything
+            if not decisions_str:
+                (Review.objects.filter(content_type=ct,
+                                       obsoleted_at__isnull=True,
+                                       object_id=obj.id,
+                                       organization_id=org[0].organization_id
+                                       )
+                    .update(obsoleted_at=timezone.now()))
+
+            # If there are no tags sent, we might still save a log message
+            if len(decisions_str) >= 3 and ':' in decisions_str:
+                decisions = [d[:257].split(':') for d in decisions_str.split(';')]
+                # 1. save to database
+                (Review.objects.filter(content_type=ct,
+                                       object_id=obj.id,
+                                       organization_id=org[0].organization_id)
+                    .exclude(key__in=[k for k, d in decisions])
+                    .update(obsoleted_at=timezone.now()))
+                reviews = [Review.objects.create(content_type=ct, object_id=obj.id,
+                                                 organization_id=org[0].organization_id,
+                                                 reviewer=request.user,
+                                                 # NOTE: we don't use vis on Reviews yet
+                                                 visibility_level=int(visibility_level),
+                                                 key=k, decision=decision)
+                           for k, decision in decisions]
 
             if log_message:
-                ReviewLog.objects.create(content_type=ct,
-                                         object_id=obj.id,
-                                         subject=int(subject) if subject else None,
-                                         organization_id=org[0].organization_id,
-                                         reviewer=request.user,
-                                         message=log_message)
+                newReviewLog = ReviewLog.objects.create(content_type=ct,
+                                        object_id=obj.id,
+                                        subject=int(subject) if subject else None,
+                                        organization_id=org[0].organization_id,
+                                        reviewer=request.user,
+                                        log_type='note',
+                                        visibility_level=int(request.POST.get('log_visibility')
+                                                             or visibility_level),
+                                        message=log_message)
             # 2. signal to obj
             if callable(getattr(obj, 'on_save_review', None)):
                 obj.on_save_review(reviews, log_message)
@@ -109,7 +132,10 @@ def save_review(request, organization, content_type, pk):
             redis.hset(reviewskey, obj_key, json_str)
             redis.lpush(itemskey, json_str)
             redis.ltrim(itemskey, 0, QUEUE_SIZE)
-            return HttpResponse("ok")
+            if log_message:
+                return JsonResponse({'id': newReviewLog.id})
+            else:
+                return HttpResponse("ok")
     return HttpResponse("nope!")
 
 
@@ -124,6 +150,11 @@ def get_review_history(request, organization):
     """
     redis = get_redis_connection(REDIS_CACHE_KEY)
     reviewskey = '{}_reviews'.format(organization)
+    visibility_level = ReviewGroup.user_visibility(organization, request.user)
+    vis_options = ReviewGroup.user_visibility_options(organization, request.user)
+
+    # Check for user delete permissions to include in log
+    can_delete = request.user.has_perm('reviewer.delete_reviewlog')
 
     content_type_id = int(request.GET.get('type'))
     ct = ContentType.objects.get_for_id(content_type_id) # confirm existence
@@ -143,30 +174,42 @@ def get_review_history(request, organization):
             if not pk:
                 continue
             subject = subjects.get(pk)
-            filters = Q(content_type_id=content_type_id,
-                        object_id=int(pk))
+            contentfilters = Q(content_type_id=content_type_id,
+                               object_id=int(pk))
             if subject:
-                filters = filters | Q(content_type_id=content_type_id,
-                                      subject=int(subject))
-            review_logs = ReviewLog.objects.filter(
-                organization__slug=organization).filter(
-                    filters).order_by('-id').values('reviewer__first_name',
-                                                    'reviewer__last_name',
-                                                    'message',
-                                                    'created_at',
-                                                    'object_id',
-                                                )
+                contentfilters = contentfilters | Q(subject=int(subject))
+            visibilityfilters = None
+            if visibility_level == 0:
+                visibilityfilters = Q(reviewer=request.user, visibility_level=0)
+            else:
+                visibilityfilters = Q(visibility_level__lte=visibility_level)
+            review_logs = (ReviewLog.objects
+                           .filter(organization__slug=organization)
+                           .filter(contentfilters)
+                           .filter(visibilityfilters)
+                           .order_by('-id').values('reviewer__first_name',
+                                                   'reviewer__last_name',
+                                                   'message',
+                                                   'created_at',
+                                                   'object_id',
+                                                   'log_type',
+                                                   'visibility_level',
+                                                   'id',
+                                               ))
             logs.append({"pk": pk, 'type': content_type_id,
                          "m": [{
                              'r': '{} {}'.format(r['reviewer__first_name'],r['reviewer__last_name'][:1]),
                              'pk': r['object_id'], #for subject search broadening
                              'm': r['message'],
-                             'ts': int(time.mktime(r['created_at'].timetuple()))
+                             'ts': int(time.mktime(r['created_at'].timetuple())),
+                             't': r['log_type'],
+                             'v': r['visibility_level'],
+                             'id': r['id'],
                          } for r in review_logs]})
     reviews = []
 
     for i,r in enumerate(cached_reviews):
-        if r is not None: 
+        if r is not None:
             reviews.append(r.decode('utf-8'))
         else: # no cached version yet
             pk = pks[i]
@@ -189,8 +232,13 @@ def get_review_history(request, organization):
             redis.hset(reviewskey, obj_key, json_str)
             reviews.append(json_str)
     return HttpResponse(
-        """{"reviews":[%s],"logs":%s}""" % (','.join(reviews), json.dumps(logs)),
+        """{"reviews":[%s],"logs":%s, "can_delete":%s, "visibility": %s}""" %
+        (','.join(reviews),
+         json.dumps(logs),
+         json.dumps(can_delete),
+         json.dumps(list(vis_options.items()))),
         content_type='application/json')
+
 
 @csrf_exempt
 @reviewgroup_auth
@@ -275,3 +323,12 @@ def current_review_state(request, organization):
         ','.join([o.decode('utf-8') for o in items]),
         ','.join([m.decode('utf-8') for m in focus])
     ), content_type='application/json')
+
+
+@reviewgroup_auth
+def delete_review(request, organization, content_type, pk, id):
+    if request.method == 'DELETE':
+        if request.user.has_perm('reviewer.delete_reviewlog'):
+            ReviewLog.objects.filter(id=id, organization__slug=organization).delete()
+            return HttpResponse("deleted")
+    return HttpResponse("nope")

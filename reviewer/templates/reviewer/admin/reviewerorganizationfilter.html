@@ -1,5 +1,8 @@
 {% load static %}
 <script src="{% static 'js/reviewer.js' %}"></script>
+<script src="{% static 'js/chosen.jquery.min.js' %}"></script>
+<link rel="stylesheet" href="{% static 'css/chosen.min.css' %}">
+<link rel="stylesheet" href="{% static 'css/reviewer.css' %}">
 
 {% if not spec.value %}
   {# need to offer options #}
@@ -12,15 +15,16 @@
 {% else %}
   {# chosen, or just one option #}
 <script>
-  var reviewState = (new Reviewer({organization: "{{spec.get_slug}}",
+  window.reviewState = (new Reviewer({organization: "{{spec.get_slug}}",
                                    schema: {{spec.review_schema_json|safe}},
                                    contentType: {{spec.content_type.id}},
                                    jQuery: window.jQuery || django.jQuery,
                                    pollRate: {{spec.poll_rate}},
-                                   apiPath: "{{spec.get_path}}"
+                                   apiPath: "{{spec.get_path}}",
+                                   selectMode: "{{spec.select_mode}}",
                                   }));
   (window.jQuery || django.jQuery)(function() {
-    setTimeout(reviewState.start, 0);
+    setTimeout(window.reviewState.start, 0);
   });
 </script>
 {% endif %}

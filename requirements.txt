@@ -14,7 +14,7 @@ requests[security]==2.11.1
 six==1.10.0
 drf-hal-json==0.9.1
 
-fakeredis
+mockredispy
 django-redis~=4.4
 django-cachalot
 
