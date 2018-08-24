@@ -4,8 +4,8 @@
 * Login as that user at /admin
 * Create a Group (no permissions necessary)
 * Edit current User and add to just created Group
-* Create an Organization and assign the just created Group to it. Note the osdi source id
-* Create an Event Source with the noted osdi source id as its osdi name. Assign the created Organization as its Origin organization. Choose a crm type from the available choices (currently only actionkit_api is supported). Set update style to Manual only, and set Allows updates to no. Note the event source name for the next step.
+* Create an Organization and assign the just created Group to it. The osdi source id has to be `moveon.org`.
+* Create an Event Source with the noted osdi source id both as its osdi name and its event source name. Assign the created Organization as its Origin organization. Choose a crm type from the available choices (currently only actionkit_api is supported). Set update style to Manual only, and set Allows updates to no. Note the event source name for the next step.
 * Run this command to import events from this source:
 `./manage.py event_exim_update --source event_source_name`
 * Newly imported events will be available for review at /admin/event_store/event/
