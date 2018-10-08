@@ -261,15 +261,17 @@ Reviewer.prototype = {
           self.focus = newFocus;
           // not just update new focii, but clear old
           for (var pk in self.state) {
-            if (pk in newFocus) {
-              //dumbest, but easiest way to compare lists
-              if (String(newFocus[pk]) != String(self.state[pk].focus)) {
-                self.state[pk].focus = newFocus[pk];
+            if (self.state[pk].o) {
+              if (pk in newFocus) {
+                //dumbest, but easiest way to compare lists
+                if (String(newFocus[pk]) != String(self.state[pk].focus)) {
+                  self.state[pk].focus = newFocus[pk];
+                  self.renderFocusUpdate(self.state[pk]);
+                }
+              } else {
+                delete self.state[pk].focus;
                 self.renderFocusUpdate(self.state[pk]);
               }
-            } else {
-              delete self.state[pk].focus;
-              self.renderFocusUpdate(self.state[pk]);
             }
           }
         },0);
@@ -527,7 +529,11 @@ Reviewer.prototype = {
     }).join('');
   },
   renderFocusUpdate: function(reviewSubject) {
-    this.$('.focus', reviewSubject.o).html(this.renderFocus(reviewSubject));
+    if (!reviewSubject.o) {
+      return // guard to make sure we have a specific obj
+    }
+    var newHtml = this.renderFocus(reviewSubject);
+    this.$('.focus', reviewSubject.o).html(newHtml);
   },
   postRender: function(reviewSubject, selectMode) {
     var $ = this.$;
