@@ -13,6 +13,14 @@ div.logitem {
   box-shadow: 0 2px 2px 1px rgba(0, 0, 0, 0.05);
 }
 
+div.collapsed {
+  height: 57px;
+  max-width: 751px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
 span.glyphicon-trash {
   font-size: 14px;
 }
