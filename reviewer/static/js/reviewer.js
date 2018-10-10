@@ -435,6 +435,7 @@ Reviewer.prototype = {
       return (''
               + `<div class="logitem ${collapseClass}" title="${tooltip}"`
               + ((other && log.pk) ? ' data-pk="'+log.pk+'" style="background-color: hsl('+hue+',17%,80%)"' : '')
+              + (log.t === 'message' ? 'data-click="false"' : '')
               + '>'
               + ((other && log.pk) ? '-- ' : '')
               + '<div class="log-author">'
@@ -628,9 +629,12 @@ Reviewer.prototype = {
     const collapsibleItems = document.querySelectorAll('div.collapsed')
 
     collapsibleItems.forEach(log => {
-      log.addEventListener('click', e => {
-        log.classList.toggle('collapsed')
-      })
+      if (log.dataset.click === 'false') {
+        log.dataset.click = true;
+        log.addEventListener('click', e => {
+          log.classList.toggle('collapsed')
+        })
+      }
     })
   }
 };
