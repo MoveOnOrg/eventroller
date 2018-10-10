@@ -15,9 +15,7 @@ div.logitem {
 
 div.collapsed {
   height: 75px;
-  width: 700px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: pre-line;
   overflow: hidden;
   align-items: flex-start;
 }

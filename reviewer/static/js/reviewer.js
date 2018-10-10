@@ -435,7 +435,7 @@ Reviewer.prototype = {
       return (''
               + `<div class="logitem ${collapseClass}" title="${tooltip}"`
               + ((other && log.pk) ? ' data-pk="'+log.pk+'" style="background-color: hsl('+hue+',17%,80%)"' : '')
-              + 'data-click="false"'
+              + (log.t === 'message' ? 'data-click="false"' : '')
               + '>'
               + ((other && log.pk) ? '-- ' : '')
               + '<div class="log-author">'
