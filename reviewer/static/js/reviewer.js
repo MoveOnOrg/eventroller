@@ -427,7 +427,7 @@ Reviewer.prototype = {
                                  + ' title="bulk note"></span>')
                               : '')))
       const collapseClass = log.t === 'message' ? 'collapsed' : ''
-      const tooltip = 'Click anywhere to expand/collapse message.'
+      const tooltip = log.t === 'message' ? 'Click anywhere to expand/collapse message.' : ''
       // Restore line breaks
       log.m = log.m.replace(/\n/g, "<br/>");
       return (''

@@ -15,7 +15,7 @@ div.logitem {
 
 div.collapsed {
   height: 57px;
-  max-width: 100%;
+  max-width: 751px;
   text-overflow: ellipsis;
   white-space: nowrap;
   overflow: hidden;
