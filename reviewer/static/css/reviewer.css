@@ -15,10 +15,11 @@ div.logitem {
 
 div.collapsed {
   height: 57px;
-  max-width: 751px;
+  width: 700px;
   text-overflow: ellipsis;
   white-space: nowrap;
   overflow: hidden;
+  align-items: flex-start;
 }
 
 span.glyphicon-trash {
@@ -39,5 +40,5 @@ div.undo-delete {
 
 div.log-author {
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
 }
