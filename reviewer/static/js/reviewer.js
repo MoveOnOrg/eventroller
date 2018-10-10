@@ -427,13 +427,18 @@ Reviewer.prototype = {
                                  + ' title="bulk note"></span>')
                               : '')))
       const collapseClass = log.t === 'message' ? 'collapsed' : ''
+      const tooltip = 'Click anywhere to expand/collapse message.'
+      // Restore line breaks
+      log.m = log.m.replace(/\n/g, "<br/>");
       return (''
-              + `<div class="logitem ${collapseClass}"`
+              + `<div class="logitem ${collapseClass}" title="${tooltip}"`
               + ((other && log.pk) ? ' data-pk="'+log.pk+'" style="background-color: hsl('+hue+',17%,80%)"' : '')
               + '>'
               + ((other && log.pk) ? '-- ' : '')
-              + '<span class="reviewer">' + log.r + '</span>'
-              + ' (' + tsStr + '): '
+              + '<div class="log-author">'
+              +   '<span class="reviewer">' + log.r + '</span>'
+              +   '<span class="timestamp">&nbsp(' + tsStr + '):&nbsp</span>'
+              + '</div>'
               + typeIcon
               + ' <span class="logm">' + log.m + '</span>'
               + `${this.state.canDelete ? deleteButton : ''}`
