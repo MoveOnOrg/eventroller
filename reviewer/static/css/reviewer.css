@@ -15,7 +15,7 @@ div.logitem {
 
 div.collapsed {
   height: 57px;
-  max-width: 751px;
+  max-width: 100%;
   text-overflow: ellipsis;
   white-space: nowrap;
   overflow: hidden;
@@ -35,4 +35,9 @@ div.undo-delete {
   bottom: 6rem;
   left: 13.5rem;
   width: 35rem;
+}
+
+div.log-author {
+  display: flex;
+  flex-direction: column;
 }
