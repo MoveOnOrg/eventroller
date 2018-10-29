@@ -24,6 +24,7 @@ function Reviewer(opts) {
     jQuery: window.jQuery,
     organization: null,
     contentType: null,
+    saveButtonText: 'Save',
     apiPath: '/review',
     cssSelector: '.review', //expects data-pk and data-type
     pollRate: 15, //number of seconds between polling for updates (0 means never)
@@ -336,7 +337,7 @@ Reviewer.prototype = {
             + '<div class="col-md-4">'+ this.renderVisibility(this.visibility) + '</div>'
             + '  </div>'
             + '  <div class="review-header" style="padding-left:15px;">'
-            + '      <button class="btn btn-default btn-primary save">Save</button>'
+            + '      <button class="btn btn-default btn-primary save">' + this.opt.saveButtonText + '</button>'
             + '      <span class="focus">' + this.renderFocus(reviewSubject) + '</span>'
             + '      <span class="saved label label-success"></span>' // save status
             + '  </div>'
