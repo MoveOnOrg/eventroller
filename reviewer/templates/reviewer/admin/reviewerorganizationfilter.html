@@ -20,6 +20,7 @@
                                    contentType: {{spec.content_type.id}},
                                    jQuery: window.jQuery || django.jQuery,
                                    pollRate: {{spec.poll_rate}},
+                                   saveButtonText: "{{spec.save_button_text|default:'Save'}}",
                                    apiPath: "{{spec.get_path}}",
                                    selectMode: "{{spec.select_mode}}",
                                   }));
