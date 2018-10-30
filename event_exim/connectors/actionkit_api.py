@@ -64,7 +64,8 @@ class Connector:
     other_fields = ['ee.id', 'ee.creator_id', 'ee.campaign_id', 'ee.phone', 'ee.notes',
                     'ec.title', 'signuppage.name', 'createpage.name',
                     'host.id', 'hostaction.id', 'hostaction2.action_ptr_id', 'hostcreateaction.action_ptr_id',
-                    'u.id', 'u.first_name', 'u.last_name', 'u.email', 'loc.us_district', 'recentphone.value']
+                    'u.id', 'u.first_name', 'u.last_name', 'u.email', 'loc.us_district', 'recentphone.value',
+                    'COUNT(emails.body_id) AS emailcount']
 
     event_fields = ['review_status', 'prep_status',
                     'needs_organizer_help', 'political_scope', 'public_phone', 'venue_category']
@@ -93,6 +94,7 @@ class Connector:
         " LEFT JOIN core_eventsignupaction hostaction2 ON (hostaction2.signup_id = host.id)"
         " LEFT JOIN core_eventcreatepage cec ON (cec.campaign_id = ee.campaign_id)"
         " LEFT JOIN core_page createpage ON (createpage.id = cec.page_ptr_id AND createpage.hidden=0 AND createpage.status='active')"
+        " LEFT JOIN events_emaillog emails ON (emails.event_id = ee.id)"
         " %(eventjoins)s "
         " xxADDITIONAL_WHERExx " #will be replaced with text or empty string on run
         # we need to include hostcreateaction in group by so it doesn't get squashed with first match
@@ -284,6 +286,7 @@ class Connector:
                                  'create_page': event_row[fi['createpage.name']],
                                  'create_action_id': cohost_create_action,
                                  'hosts': hosts,
+                                 'emailstoattendees': event_row[fi['COUNT(emails.body_id) AS emailcount']],
                              }),
                          })
         for df in self.date_fields:
