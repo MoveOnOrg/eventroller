@@ -239,6 +239,7 @@ class EventDupeGuesses(models.Model):
 
     class Meta:
         unique_together = (('source_event','dupe_event'),)
+        # TODO: reverse order by recency
   
     @staticmethod
     def get_potential_dupes():
