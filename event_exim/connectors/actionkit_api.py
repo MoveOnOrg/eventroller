@@ -62,7 +62,7 @@ class Connector:
                      'updated_at']
 
     other_fields = ['ee.id', 'ee.creator_id', 'ee.campaign_id', 'ee.phone', 'ee.notes',
-                    'ec.title', 'signuppage.name', 'createpage.name',
+                    'ec.title', 'ee.us_district', 'signuppage.name', 'createpage.name',
                     'host.id', 'hostaction.id', 'hostaction2.action_ptr_id', 'hostcreateaction.action_ptr_id',
                     'u.id', 'u.first_name', 'u.last_name', 'u.email', 'loc.us_district', 'recentphone.value']
 
@@ -231,7 +231,7 @@ class Connector:
                 base=self.base_url, attend_page=signuppage)
             if signuppage else None)
         slug = '{}-{}'.format(re.sub(r'\W', '', self.base_url.split('://')[1]), e_id)
-        state, district = (event_row[fi['loc.us_district']] or '_').split('_')
+        state, district = (event_row[fi['ee.us_district']] or '_').split('_')
         ocdep_location = ('ocd-division/country:us/state:{}/cd:{}'.format(state.lower(), district)
                           if state and district else None)
 
