@@ -110,7 +110,7 @@ class EventDisplayAdminMixin:
                 """,
                 private_phone=phone_format(obj.private_phone),
                 active_status=obj.status,
-                review_widget=review_widget(obj, obj.organization_host_id),
+                review_widget=review_widget(obj, obj.organization_host.member_system_pk),
                 internal_notes=(long_field(obj.internal_notes,'<b>Past Notes</b>') if obj.internal_notes else '')
             )
         return format_html(
