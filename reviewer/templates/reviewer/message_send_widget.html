@@ -22,12 +22,11 @@ $('#send-message--{{obj_id}}--w{{widget_id|default:0}}').click(function(evt) {
 $('#send-message-status--{{obj_id}}--w{{widget_id|default:0}} button').click(function(evt) {
   evt.preventDefault();
 
-  legal_message =   "WARNING: Messages can only pertain to federal House and Senate "
-                  + "campaigns. Do not refer to gubernatorial or any other "
-                  + "downballot campaigns in your message."
-                  + "\n\nPress OK to confirm that your message complies with the above."
-
-  if (confirm(legal_message)) {
+  var legal_message = ("WARNING: If this is an electorally focused event, please refrain "
+                       + "from referencing any state or local campaign in your message. "
+                       + "This is to ensure compliance in local campaign finance laws. "
+                       + "Press OK to confirm that yourmessage complies with the above.")
+  if (!legal_message || confirm(legal_message)) {
     var $link = $('#send-message--{{obj_id}}--w{{widget_id|default:0}}');
     var $status = $('#send-message-status--{{obj_id}}--w{{widget_id|default:0}}');
     $(this).addClass('hidden');
