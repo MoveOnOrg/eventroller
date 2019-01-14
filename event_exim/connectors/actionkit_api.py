@@ -219,7 +219,15 @@ class Connector:
         """
         event_row = event_rows[0]
         fi = self.field_indexes
-        event_fields = {k:event_row[fi[k]] for k in self.common_fields}
+        hackattempt = False
+        def cleannullchars(val):
+            if isinstance(val, str) and '\x00' in val:
+                hackattempt = True
+                # it would be nice to have a longer in-place message,
+                # but we don't want to break char-count maximums
+                return val.replace('\x00', 'X')
+            return val
+        event_fields = {k:cleannullchars(event_row[fi[k]]) for k in self.common_fields}
         signuppage = event_row[fi['signuppage.name']]
         e_id = event_row[fi['ee.id']]
         rsvp_url = (
@@ -284,6 +292,7 @@ class Connector:
                                  'create_page': event_row[fi['createpage.name']],
                                  'create_action_id': cohost_create_action,
                                  'hosts': hosts,
+                                 'hack': hackattempt
                              }),
                          })
         for df in self.date_fields:
