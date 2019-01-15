@@ -220,14 +220,21 @@ class Connector:
         event_row = event_rows[0]
         fi = self.field_indexes
         hackattempt = False
-        def cleannullchars(val):
-            if isinstance(val, str) and '\x00' in val:
-                hackattempt = True
-                # it would be nice to have a longer in-place message,
-                # but we don't want to break char-count maximums
-                return val.replace('\x00', 'X')
+        def cleanchars(val, key):
+            if isinstance(val, str):
+                if key == 'state':
+                    if not re.match(r'[A-Z][A-Z]', val.upper()):
+                        # indication of corrupted state
+                        hackattempt = True
+                        return 'XX'
+                    return val.upper() # tx => TX
+                if '\x00' in val:
+                    hackattempt = True
+                    # it would be nice to have a longer in-place message,
+                    # but we don't want to break char-count maximums
+                    return val.replace('\x00', 'X')
             return val
-        event_fields = {k:cleannullchars(event_row[fi[k]]) for k in self.common_fields}
+        event_fields = {k:cleanchars(event_row[fi[k]], k) for k in self.common_fields}
         signuppage = event_row[fi['signuppage.name']]
         e_id = event_row[fi['ee.id']]
         rsvp_url = (
