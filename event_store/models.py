@@ -4,6 +4,7 @@ import re
 
 from django.db import models
 from django.contrib.auth.models import User, Group
+from django.utils.html import format_html, mark_safe
 
 class Organization(models.Model):
     title = models.CharField(max_length=765)
@@ -219,6 +220,14 @@ class Event(models.Model):
             'review_status': self.organization_status_review,
             'prep_status': self.organization_status_prep,
         }
+
+    @classmethod
+    def phone_format(cls, phone):
+        return format_html('<span style="white-space: nowrap">{}</span>',
+                           re.sub(r'^(\d{3})(\d{3})(\d{4})', '(\\1) \\2-\\3',
+                                  phone))
+
+
 
     @classmethod
     def political_scope_display(cls, political_scope):

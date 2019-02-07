@@ -9,7 +9,7 @@ from django.utils.html import format_html, mark_safe
 from actionkit.api.event import AKEventAPI
 from actionkit.api.user import AKUserAPI
 from actionkit.utils import generate_akid
-from event_store.models import Activist, CHOICES
+from event_store.models import Activist, Event, CHOICES
 
 """
 Non-standard use in ActionKit:
@@ -401,22 +401,41 @@ class Connector:
                 host_link = '/login/?i={}&l=1&next={}'.format(token, host_link)
         return '{}{}'.format(self.base_url, host_link)
 
-    def get_extra_event_management_html(self, event):
+    def get_additional_hosts(self, event):
+        additional_hosts = []
         if event.source_json_data:
             json_data = json.loads(event.source_json_data)
             hosts = json_data.get('hosts')
-            additional_hosts = []
             if hosts:
                 for hostpk, host in hosts.items():
                     if int(hostpk) not in self.ignore_hosts\
                        and (not event.organization_host_id\
                             or hostpk != event.organization_host.member_system_pk):
                         additional_hosts.append(host)
-                if additional_hosts:
-                    return mark_safe(
-                        '<div><b>Additional Hosts:</b>'
-                        + ''.join([
-                            format_html('<span data-pk="{}">{}</span>', h['member_system_pk'], h['name'])
-                            for h in additional_hosts])
-                        + '</div>')
+        return additional_hosts
+
+    def get_extra_event_management_html(self, event):
+        additional_hosts = self.get_additional_hosts(event)
+        def host_format(host):
+            # glyphicon glyphicon-envelope
+            # glyphicon glyphicon-earphone
+            additional_info = []
+            if host.get('email'):
+                additional_info.append(format_html(
+                    '<a href="mailto:{}"><span class="glyphicon glyphicon-envelope"></span></a>',
+                    host['email']))
+            if host.get('phone'):
+                additional_info.append(format_html(
+                    '<span class="glyphicon glyphicon-earphone"></span> {}',
+                    Event.phone_format(host['phone'])))
+            return format_html('<div data-pk="{}">{} {}</div>',
+                               host['member_system_pk'],
+                               host['name'],
+                               mark_safe(' '.join(additional_info)))
+
+        if additional_hosts:
+            return mark_safe(
+                '<div><b>Additional Hosts:</b>'
+                + ''.join([host_format(h) for h in additional_hosts])
+                + '</div>')
         return None

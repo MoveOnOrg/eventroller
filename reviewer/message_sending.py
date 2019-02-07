@@ -281,13 +281,14 @@ def create_message(to=None, subject=None, message_text=None, message_html='',
                    reply_to=None, headers=None,
                    actually_send=False, **kwargs):
     extra_args = {}
+    to_list = to if isinstance(to, list) else [to]
     if reply_to:
         extra_args['reply_to'] = [reply_to]  # EmailMultiAlternatives takes a list
     if headers:
         extra_args['headers'] = headers
     if not from_line and from_name and from_email:
         from_line = '"{}" <{}>'.format(from_name.replace('"', '\\"'), from_email)
-    mailmessage = EmailMultiAlternatives(subject, message_text, from_line, [to],
+    mailmessage = EmailMultiAlternatives(subject, message_text, from_line, to_list,
                                          **extra_args)
     if message_html:
         mailmessage.attach_alternative(message_html, "text/html")
