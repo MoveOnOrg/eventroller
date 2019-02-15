@@ -223,7 +223,7 @@ class Connector:
         def cleanchars(val, key):
             if isinstance(val, str):
                 if key == 'state':
-                    if not re.match(r'[A-Z][A-Z]', val.upper()):
+                    if not re.match(r'^[A-Z][A-Z]$', val.upper()):
                         # indication of corrupted state
                         hackattempt = True
                         return 'XX'
