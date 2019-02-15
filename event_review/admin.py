@@ -1,3 +1,4 @@
+import json
 import re
 
 from django.conf import settings
@@ -24,11 +25,6 @@ from event_review.filters import (filter_with_emptyvalue,
                                   SortingFilter)
 
 from huerta.filters import CollapsedListFilter, textinputfilter_factory
-
-def phone_format(phone):
-    return format_html('<span style="white-space: nowrap">{}</span>',
-                       re.sub(r'^(\d{3})(\d{3})(\d{4})', '(\\1) \\2-\\3',
-                              phone))
 
 def host_format(modeladmin, event):
     host = event.organization_host
@@ -69,20 +65,6 @@ def host_format(modeladmin, event):
     return mark_safe(' <span class="glyphicon glyphicon-star-empty"></span>'.join(host_items))
 
 
-def message_to_host(event):
-    ### TODO: DELETE THIS METHOD
-    ### We need to be able to pass the widget through the meta host_format, event_list_display
-    try:
-        api_link = reverse('event_review_host_message', args=[event.organization.slug, event.id, ''])
-        return render_to_string(
-            'reviewer/message_send_widget.html',
-            {'obj_id':event.id,
-             'placeholder': 'Optional message to host. Email will include a link to manage the event.',
-             'link': api_link})
-    except NoReverseMatch:
-        return ''
-
-
 def long_field(longtext, heading=''):
     if not longtext:
         return ''
@@ -108,7 +90,7 @@ class EventDisplayAdminMixin:
                   {internal_notes}
                 </div>
                 """,
-                private_phone=phone_format(obj.private_phone),
+                private_phone=Event.phone_format(obj.private_phone),
                 active_status=obj.status,
                 review_widget=review_widget(obj, obj.organization_host_id),
                 internal_notes=(long_field(obj.internal_notes,'<b>Past Notes</b>') if obj.internal_notes else '')
@@ -219,6 +201,9 @@ class EventAdmin(MessageSendingAdminMixin, admin.ModelAdmin, EventDisplayAdminMi
 
     ## BEGIN EventAdmin Message Sending
     send_a_message_placeholder = 'Optional message to host. Email will include a link to manage the event.'
+    def obj_person_noun(self):
+        return 'host(s)'
+
     def message_template(self, message, event, user=None):
         """
         NOTE: This takes a while to render, almost entirely because
@@ -239,8 +224,15 @@ class EventAdmin(MessageSendingAdminMixin, admin.ModelAdmin, EventDisplayAdminMi
              'message': message,
              'footer': getattr(settings, 'EVENT_REVIEW_MESSAGE_FOOTER',
                                "\nThanks for all you do.")})
+        to_list = [event.organization_host.email]
+        if hasattr(src.api, 'get_additional_hosts'):
+            additional_hosts = src.api.get_additional_hosts(event)
+            for ahost in additional_hosts:
+                if ahost.get('email'):
+                    to_list.append(ahost['email'])
+
         return {
-            'to': event.organization_host.email,
+            'to': to_list,
             'subject': email_subject,
             'message_text': message,
             'from_line': settings.FROM_EMAIL,
