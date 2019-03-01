@@ -52,15 +52,16 @@ def host_format(modeladmin, event):
             and getattr(modeladmin, 'send_message_widget', None)):
             host_items.append(modeladmin.send_message_widget(event))
 
+    # give settings a chance to tweak/alter/add items
+    customize_host_link = getattr(settings, 'EVENT_REVIEW_CUSTOM_HOST_DISPLAY', None)
+    if callable(customize_host_link):
+        host_items = customize_host_link(event, host_items)
+
     # from the connector
     extra_html=event.extra_management_html()
     if extra_html:
         host_items.append(extra_html)
 
-    # give settings a chance to tweak/alter/add items
-    customize_host_link = getattr(settings, 'EVENT_REVIEW_CUSTOM_HOST_DISPLAY', None)
-    if callable(customize_host_link):
-        host_items = customize_host_link(event, host_items)
     host_items.insert(0, ' '.join(host_line))
     return mark_safe(' <span class="glyphicon glyphicon-star-empty"></span>'.join(host_items))
 
