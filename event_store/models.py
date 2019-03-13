@@ -97,6 +97,7 @@ CHOICES = {
     'searchable': 1,
 }
 
+
 class Event(models.Model):
     #starting with ActionKit baseline, out of selfishness
     created_at = models.DateTimeField(auto_now_add=True)
@@ -267,3 +268,9 @@ class Event(models.Model):
                 changed = True
         if changed:
             self.save()
+
+
+class EventRole(models.Model):
+    activist = models.ForeignKey(Activist, db_index=True)
+    event = models.ForeignKey(Event, db_index=True)
+    event_updated = models.DateTimeField(null=True, blank=True)

@@ -10,7 +10,7 @@ from django.db.models import Count
 # from django.db.models.signals import post_save
 # from django.dispatch import receiver
 
-from event_store.models import Activist, Event, Organization
+from event_store.models import Activist, Event, EventRole, Organization
 from event_exim import connectors
 
 CRM_TYPES = {
@@ -72,7 +72,7 @@ class EventSource(models.Model):
     def update_event(self, source_pk):
         event_dict = self.api.get_event(source_pk)
         if event_dict:
-            self.update_events_from_dicts([event_dict])
+            self.update_events_from_dicts({'events': [event_dict]})
         return event_dict
 
     def update_events(self, last_update=None):
@@ -83,38 +83,47 @@ class EventSource(models.Model):
         if last_update is None:
             last_update = self.last_update
         event_data = self.api.load_events(last_updated=last_update)
-        self.update_events_from_dicts(event_data['events'])
+        self.update_events_from_dicts(event_data)
         # now that we've updated things, save this EventSource record with last_updated
         self.last_update = event_data['last_updated']
         self.save()
 
-    def update_events_from_dicts(self, event_dicts):
+    def update_hosts(self, event_data):
+        new_host_ids = dict()
+        if 'events' in event_data:
+            for e in event_data['events']:
+                if e['organization_host']:
+                    new_host_ids[e['organization_host'].member_system_pk] = e['organization_host']
+        if 'hosts' in event_data:
+            for h in event_data['hosts']:
+                new_host_ids[h.member_system_pk] = h
+        host_update_fields = ('hashed_email', 'email', 'name', 'phone')
+        # start with existing hosts
+        hosts = {a.member_system_pk:a
+                 for a in Activist.objects.filter(member_system=self,
+                                                  member_system_pk__in=new_host_ids)}
+        for member_system_pk, new_host in new_host_ids.items():
+            host_by_pk = hosts.get(member_system_pk)
+            if host_by_pk:
+                new_host.id = host_by_pk.id
+                for hf in host_update_fields:
+                    if etattr(host_by_pk, hf) != getattr(new_host, hf):
+                        new_host.save()
+                        hosts[member_system_pk] = new_host
+                        break # inner loop
+                
+            else:
+                new_host.save()
+                hosts[member_system_pk] = new_host
+        return hosts
+
+    def update_events_from_dicts(self, event_data):
+        hosts = self.update_hosts(event_data)
+
+        event_dicts = event_data['events']
         all_events = {str(e['organization_source_pk']):e for e in event_dicts}
-        new_host_ids = set([e['organization_host'].member_system_pk
-                            for e in all_events.values()
-                            if e['organization_host']])
         existing = list(Event.objects.filter(organization_source_pk__in=all_events.keys(),
                                              organization_source=self))
-        # 2. save hosts, new and existing Activist records
-        host_update_fields = ('hashed_email', 'email', 'name', 'phone')
-        existing_hosts = {a.member_system_pk:a
-                          for a in Activist.objects.filter(member_system=self,
-                                                           member_system_pk__in=new_host_ids)}
-        for e in all_events.values():
-            ehost = e.get('organization_host')
-            if ehost:
-                host_by_pk = existing_hosts.get(ehost.member_system_pk)
-                if host_by_pk:
-                    ehost.id = host_by_pk.id
-                    for hf in host_update_fields:
-                        if getattr(host_by_pk, hf) != getattr(ehost, hf):
-                            ehost.save()
-                            existing_hosts[ehost.member_system_pk] = ehost
-                            break #inner loop
-                else:
-                    ehost.save()
-                    existing_hosts[ehost.member_system_pk] = ehost
-
         # 3. bulk-create all new events not in the system yet
         existing_ids = set([e.organization_source_pk for e in existing])
         new_events = [Event(**e) for e in all_events.values()
@@ -124,6 +133,14 @@ class EventSource(models.Model):
         # 4. save any changes to existing events
         for e in existing:
             self.update_event_from_dict(e, all_events[e.organization_source_pk])
+
+        # 5. Bulk find existing event-host records
+        # TODO: sort into three buckets
+        # to_delete, to_create, ignore
+        # TODO: auto create the ones that were just created
+        
+        to_delete = []
+        to_create = []
 
     def update_event_from_dict(self, event, new_event_dict):
         changed = False
