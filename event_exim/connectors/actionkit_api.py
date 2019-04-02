@@ -139,7 +139,10 @@ class Connector:
                 'cohost_id': {'help_text': ('for easy Act-as-host links, if all events'
                                             ' have a cohost, then this will create'
                                             ' links that do not need ActionKit staff access'),
-                              'required': False}
+                              'required': False},
+                'cohost_autocreate_page_id': {'help_text': ('If you want the cohost auto-added as a host'
+                                                            'to all events add a page_id for event signup'),
+                                              'required': False},
 
         }
 
@@ -160,6 +163,7 @@ class Connector:
                                      if re.match(r'^\d+$', h)
                                  ])
         self.cohost_id = data.get('cohost_id')
+        self.cohost_autocreate_page_id = data.get('cohost_autocreate_page_id')
         self._allowed_hosts = set(data['base_url'].split('/')[2])
         if data.get('allowed_hosts'):
             self._allowed_hosts.update(data['allowed_hosts'].split(','))
@@ -265,6 +269,18 @@ class Connector:
                 hosts[hostpk] = host
             if hostpk == self.cohost_id:
                 cohost_create_action = host['create_action']
+        if self.cohost_autocreate_page_id \
+           and self.cohost_id \
+           and not cohost_create_action:
+            # cohost has not been added yet -- let's add it
+            res = self.akapi.create_signup(self.cohost_id,
+                                           e_id,
+                                           self.cohost_autocreate_page_id,
+                                           role='host',
+                                           fields={'source': 'automatic',
+                                                   'provider': 'eventroller'})
+            if res and res.get('id'):
+                cohost_create_action = int(res['id'])
 
         event_fields.update({'organization_official_event': False,
                              'event_type': 'unknown',
