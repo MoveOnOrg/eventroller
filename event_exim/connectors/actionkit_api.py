@@ -340,7 +340,7 @@ class Connector:
             additional_where.append('ee.campaign_id = {{ campaign_id }}')
             additional_params['campaign_id'] = campaign
         if last_updated:
-            additional_where.append('ee.updated_at > {{ last_updated }}')
+            additional_where.append('(ee.updated_at > {{ last_updated }} OR ec.updated_at > {{ last_updated }})')
             additional_params['last_updated'] = last_updated
         # all_events keyed by id with values as a list of event_rows for the event
         # there can be multiple rows, at least because there can be multiple hosts
