@@ -68,7 +68,7 @@ class Activist(models.Model):
 
 
 EVENT_REVIEW_CHOICES = ((None, 'New'),
-                        ('reviewed', 'Reviewed'),
+                        ('reviewed', 'Claimed'),
                         ('vetted', 'Vetted'),
                         ('questionable', 'Questionable'),
                         ('limbo', 'Limbo'))
