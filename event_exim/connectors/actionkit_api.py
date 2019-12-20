@@ -61,7 +61,7 @@ class Connector:
                      'public_description', 'directions', 'note_to_attendees',
                      'updated_at']
 
-    other_fields = ['ee.id', 'ee.creator_id', 'ee.campaign_id', 'ee.phone', 'ee.notes',
+    other_fields = ['ee.id', 'ee.creator_id', 'ee.campaign_id', 'ee.phone', 'ee.notes', 'ec.name',
                     'ec.title', 'ee.us_district', 'signuppage.name', 'createpage.name',
                     'host.id', 'hostaction.id', 'hostaction2.action_ptr_id', 'hostcreateaction.action_ptr_id',
                     'u.id', 'u.first_name', 'u.last_name', 'u.email', 'loc.us_district', 'recentphone.value']
@@ -240,6 +240,7 @@ class Connector:
             return val
         event_fields = {k:cleanchars(event_row[fi[k]], k) for k in self.common_fields}
         signuppage = event_row[fi['signuppage.name']]
+        campaign_slug = event_row[fi['ec.name']]
         e_id = event_row[fi['ee.id']]
         rsvp_url = (
             '{base}/event/{attend_page}/{event_id}/'.format(
@@ -315,7 +316,8 @@ class Connector:
                                  'create_page': event_row[fi['createpage.name']],
                                  'create_action_id': cohost_create_action,
                                  'hosts': hosts,
-                                 'hack': hackattempt
+                                 'hack': hackattempt,
+                                 'campaign_slug': campaign_slug,
                              }),
                          })
         for df in self.date_fields:

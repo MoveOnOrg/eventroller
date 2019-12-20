@@ -7,6 +7,7 @@ from django.contrib.auth.models import User, Group, Permission
 from django.db import models
 from django.utils.functional import cached_property
 from django.db.models import Count
+from django.dispatch import Signal
 # from django.db.models.signals import post_save
 # from django.dispatch import receiver
 
@@ -23,6 +24,8 @@ CRM_TYPES = {
     #'osdi_endpoint'
 }
 
+
+event_source_updated = Signal(providing_args=["event_data", "last_update"])
 
 class EventSource(models.Model):
 
@@ -87,6 +90,7 @@ class EventSource(models.Model):
         # now that we've updated things, save this EventSource record with last_updated
         self.last_update = event_data['last_updated']
         self.save()
+        event_source_updated.send(self, event_data=event_data, last_update=self.last_update)
 
     def update_events_from_dicts(self, event_dicts):
         all_events = {str(e['organization_source_pk']):e for e in event_dicts}
