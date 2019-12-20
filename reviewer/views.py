@@ -231,13 +231,16 @@ def get_review_history(request, organization):
             json_str = json.dumps(objrev)
             redis.hset(reviewskey, obj_key, json_str)
             reviews.append(json_str)
-    return HttpResponse(
+
+    res = HttpResponse(
         """{"reviews":[%s],"logs":%s, "can_delete":%s, "visibility": %s}""" %
         (','.join(reviews),
          json.dumps(logs),
          json.dumps(can_delete),
          json.dumps(list(vis_options.items()))),
         content_type='application/json')
+    res['Cache-Control'] = "no-cache"
+    return res
 
 
 @csrf_exempt
