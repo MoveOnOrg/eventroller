@@ -95,16 +95,16 @@ class EventSource(models.Model):
     def update_events_from_dicts(self, event_dicts):
         all_events = {str(e['organization_source_pk']):e for e in event_dicts}
         new_host_ids = set([e['organization_host'].member_system_pk
-                            for e in all_events.values()
+                            for e in list(all_events.values())
                             if e['organization_host']])
-        existing = list(Event.objects.filter(organization_source_pk__in=all_events.keys(),
+        existing = list(Event.objects.filter(organization_source_pk__in=list(all_events.keys()),
                                              organization_source=self))
         # 2. save hosts, new and existing Activist records
         host_update_fields = ('hashed_email', 'email', 'name', 'phone')
         existing_hosts = {a.member_system_pk:a
                           for a in Activist.objects.filter(member_system=self,
                                                            member_system_pk__in=new_host_ids)}
-        for e in all_events.values():
+        for e in list(all_events.values()):
             ehost = e.get('organization_host')
             if ehost:
                 host_by_pk = existing_hosts.get(ehost.member_system_pk)
@@ -121,7 +121,7 @@ class EventSource(models.Model):
 
         # 3. bulk-create all new events not in the system yet
         existing_ids = set([e.organization_source_pk for e in existing])
-        new_events = [Event(**e) for e in all_events.values()
+        new_events = [Event(**e) for e in list(all_events.values())
                       if e['organization_source_pk'] not in existing_ids]
         Event.objects.bulk_create(new_events)
 
@@ -131,7 +131,7 @@ class EventSource(models.Model):
 
     def update_event_from_dict(self, event, new_event_dict):
         changed = False
-        for k,v in new_event_dict.items():
+        for k,v in list(new_event_dict.items()):
             if k == 'organization_host' and event.organization_host:
                 if not event.organization_host.likely_same(v):
                     event.organization_host = v
@@ -151,8 +151,8 @@ class EventSource(models.Model):
             possible_sources = getattr(settings, 'EVENT_SOURCES', {})
         results = {}
         if source:
-            possible_sources = {k:v for k,v in possible_sources.items() if k==source}
-        for source_name, source_data in possible_sources.items():
+            possible_sources = {k:v for k,v in list(possible_sources.items()) if k==source}
+        for source_name, source_data in list(possible_sources.items()):
             data = source_data.get('autocreate')
             #validate
             if not data:
@@ -179,12 +179,12 @@ class EventSource(models.Model):
                     else:
                         results[source_name] = ['Creating EventSource %s.' % source_name]
                         db_source = EventSource(name=source_name)
-                        for field, val in eventsource_spec.items():
+                        for field, val in list(eventsource_spec.items()):
                             if hasattr(db_source, field):
                                 setattr(db_source, field, val)
                         if not db_org:
                             db_org = Organization()
-                            for field, val in organization_spec.items():
+                            for field, val in list(organization_spec.items()):
                                 if field == 'group':
                                     db_org.group, created = Group.objects.get_or_create(
                                         name=val)

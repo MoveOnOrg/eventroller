@@ -17,5 +17,5 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         results = EventSource.autocreate_from_settings(source=options.get('source'))
-        for source_name, source_results in results.items():
-            print('{}:\n   {}'.format(source_name, "\n   ".join(source_results)))
+        for source_name, source_results in list(results.items()):
+            print(('{}:\n   {}'.format(source_name, "\n   ".join(source_results))))

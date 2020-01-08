@@ -241,7 +241,7 @@ class Connector:
             return list(events.values())
         else:
             fb_events = []
-            for page_id, result in events.items():
+            for page_id, result in list(events.items()):
                 fb_events.extend(result.get('events',{}).get('data',[]))
                 next_link = result.get('events',{}).get('paging',{}).get('next')
                 while next_link and follow_next > 0:

@@ -254,7 +254,7 @@ class MessageSendingAdminMixin:
             title=title,
             organization_slug=organization_slug,
             visibility_options=(
-                ReviewGroup.user_visibility_options(organization_slug, request.user).items()
+                list(ReviewGroup.user_visibility_options(organization_slug, request.user).items())
                 if organization_slug else None),
             objects_name=objects_name,
             queryset=queryset,

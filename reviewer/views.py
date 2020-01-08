@@ -271,7 +271,7 @@ def _clear_old_focus(organization, max=FOCUS_MAX):
     rkey = '{}_focus'.format(organization)
     focus = sorted(
         [json.loads(v.decode('utf-8'))
-         for v in redis.hgetall(rkey).values()],
+         for v in list(redis.hgetall(rkey).values())],
         key=lambda m: m[3], reverse=True)
     to_delete = [m[2] for i, m in enumerate(focus)
                  if i > max or m[3] < too_old]
@@ -301,7 +301,7 @@ def current_review_state(request, organization):
     itemskey = '{}_items'.format(organization)
     num_items = int(request.GET.get('num', QUEUE_SIZE / 2))
     items = redis.lrange(itemskey, 0, num_items)
-    focus = redis.hgetall('{}_focus'.format(organization)).values()
+    focus = list(redis.hgetall('{}_focus'.format(organization)).values())
     if not items:
         org = ReviewGroup.org_groups(organization)
         if not org:
@@ -313,7 +313,7 @@ def current_review_state(request, organization):
             # no keys, so to stop db hits every time, we push an empty
             redis.lpush(itemskey, '')
         else:
-            json_revs = [json.dumps(r) for r in reviews.values()]
+            json_revs = [json.dumps(r) for r in list(reviews.values())]
             redis.lpush(itemskey, *json_revs)
     else:
         if items[-1] == b'':

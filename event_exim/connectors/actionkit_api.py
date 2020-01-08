@@ -364,7 +364,7 @@ class Connector:
                     else:
                         all_events[e_id] = [event_row]
                         event_count = event_count + 1
-        return {'events': [self._convert_event(event_rows) for event_rows in all_events.values()],
+        return {'events': [self._convert_event(event_rows) for event_rows in list(all_events.values())],
                 'last_updated': datetime.datetime.utcnow().strftime(DATE_FMT)}
 
     def update_review(self, event, reviews, log_message):
@@ -425,7 +425,7 @@ class Connector:
             json_data = json.loads(event.source_json_data)
             hosts = json_data.get('hosts')
             if hosts:
-                for hostpk, host in hosts.items():
+                for hostpk, host in list(hosts.items()):
                     if int(hostpk) not in self.ignore_hosts\
                        and (not event.organization_host_id\
                             or hostpk != event.organization_host.member_system_pk):

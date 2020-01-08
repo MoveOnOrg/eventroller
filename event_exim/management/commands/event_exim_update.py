@@ -48,7 +48,7 @@ class Command(BaseCommand):
             if options['from_start']:
                 kwargs['last_update'] = ''
             if options['event_pk']:
-                print(s.update_event(options['event_pk']))
+                print((s.update_event(options['event_pk'])))
             else:
-                print('updating', s, options['last_update'] or '')
+                print(('updating', s, options['last_update'] or ''))
                 s.update_events(**kwargs)
