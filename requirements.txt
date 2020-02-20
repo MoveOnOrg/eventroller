@@ -10,7 +10,7 @@ git+https://github.com/tzangms/django-bootstrap-form.git@5fff56f715bd9f2f29793f6
 #mysqlclient==1.3.7
 psycopg2==2.7.1
 
-requests==2.20.0
+requests==2.23.0
 six==1.10.0
 drf-hal-json==0.9.1
 
