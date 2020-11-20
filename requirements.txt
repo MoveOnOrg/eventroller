@@ -19,4 +19,5 @@ django-redis~=4.4
 django-cachalot
 
 boto==2.49.0
+boto3==1.9.130
 zappa
