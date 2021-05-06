@@ -11,7 +11,7 @@ git+https://github.com/tzangms/django-bootstrap-form.git@5fff56f715bd9f2f29793f6
 psycopg2==2.7.5
 
 requests==2.20.0
-six==1.11.0
+six==1.16.0
 drf-hal-json==0.9.1
 
 mockredispy
