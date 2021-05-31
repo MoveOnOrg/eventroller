@@ -15,7 +15,7 @@ six==1.11.0
 drf-hal-json==0.9.1
 
 mockredispy
-django-redis~=4.4
+django-redis~=5.0
 django-cachalot
 
 boto3==1.9.130
