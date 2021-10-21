@@ -359,14 +359,17 @@ class Connector:
                                                 additional_where=additional_where,
                                                 additional_params=additional_params,
                                                 max_results=min(10000, max_events))
-            if events:
-                for event_row in events:
-                    e_id = event_row[self.field_indexes['ee.id']]
-                    if e_id in all_events:
-                        all_events[e_id].append(event_row)
-                    else:
-                        all_events[e_id] = [event_row]
-                        event_count = event_count + 1
+            if not events:
+                break
+            if len(events) == 0:
+                break
+            for event_row in events:
+                e_id = event_row[self.field_indexes['ee.id']]
+                if e_id in all_events:
+                    all_events[e_id].append(event_row)
+                else:
+                    all_events[e_id] = [event_row]
+                    event_count = event_count + 1
         return {'events': [self._convert_event(event_rows) for event_rows in all_events.values()],
                 'last_updated': datetime.datetime.utcnow().strftime(DATE_FMT)}
 
