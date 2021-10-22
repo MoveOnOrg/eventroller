@@ -29,9 +29,11 @@ DATE_FMT = '%Y-%m-%d %H:%M:%S'
 
 _LOGIN_TOKENS = {}
 
+
 class AKAPI(AKUserAPI, AKEventAPI):
     #merge both user and event apis in one class
     pass
+
 
 class Connector:
     """
@@ -70,11 +72,11 @@ class Connector:
                     'needs_organizer_help', 'political_scope', 'public_phone', 'venue_category']
 
     #column indexes for the above fields
-    field_indexes = {k:i for i,k in enumerate(
+    field_indexes = {k: i for i, k in enumerate(
         common_fields
         + other_fields
         # this looks complicated, but just alternates between <field>, <field>_id for the eventfield id
-        + list(chain(*[(ef,'%s_id' % ef) for ef in event_fields]))
+        + list(chain(*[(ef, '%s_id' % ef) for ef in event_fields]))
     )}
 
     sql_query = (
@@ -94,7 +96,7 @@ class Connector:
         " LEFT JOIN core_eventcreatepage cec ON (cec.campaign_id = ee.campaign_id)"
         " LEFT JOIN core_page createpage ON (createpage.id = cec.page_ptr_id AND createpage.hidden=0 AND createpage.status='active')"
         " %(eventjoins)s "
-        " xxADDITIONAL_WHERExx " #will be replaced with text or empty string on run
+        " xxADDITIONAL_WHERExx "  # will be replaced with text or empty string on run
         # we need to include hostcreateaction in group by so it doesn't get squashed with first match
         " GROUP BY ee.id, host.id, hostcreateaction.action_ptr_id"
         " ORDER BY {{ ordering }} DESC"
@@ -105,9 +107,8 @@ class Connector:
          'eventfields': ','.join(['{f}.value, {f}.id'.format(f=f) for f in event_fields]),
          'eventjoins': ' '.join([("LEFT JOIN events_eventfield {f}"
                                   " ON ({f}.parent_id=ee.id AND {f}.name = '{f}')"
-                              ).format(f=f) for f in event_fields]),
-                                   }
-
+                                  ).format(f=f) for f in event_fields]),
+         }
 
     @classmethod
     def writable(cls):
@@ -118,7 +119,7 @@ class Connector:
         return {'campaign': {'help_text': 'ID (a number) of campaign if just for a single campaign',
                              'required': False},
                 'api_password': {'help_text': 'api password',
-                            'required': True},
+                                 'required': True},
                 'api_user': {'help_text': 'api username',
                              'required': True},
                 'max_event_load': {'help_text': ('The default number of events to back-load from'
@@ -144,13 +145,14 @@ class Connector:
                                                             'to all events add a page_id for event signup'),
                                               'required': False},
 
-        }
+                }
 
     def __init__(self, event_source):
         self.source = event_source
         data = event_source.data
 
         self.base_url = data['base_url']
+
         class aksettings:
             AK_BASEURL = data['base_url']
             AK_USER = data['api_user']
@@ -161,7 +163,7 @@ class Connector:
         if 'ignore_host_ids' in data:
             self.ignore_hosts = set([int(h) for h in data['ignore_host_ids'].split(',')
                                      if re.match(r'^\d+$', h)
-                                 ])
+                                     ])
         self.cohost_id = data.get('cohost_id')
         self.cohost_autocreate_page_id = data.get('cohost_autocreate_page_id')
         self._allowed_hosts = set(data['base_url'].split('/')[2])
@@ -214,7 +216,7 @@ class Connector:
                     # since the create action is just based on event_id, not the user
                     create_action=(event_row[fi['hostaction2.action_ptr_id']]
                                    or event_row[fi['hostaction.id']])
-        )
+                    )
 
     def _convert_event(self, event_rows):
         """
@@ -224,6 +226,7 @@ class Connector:
         event_row = event_rows[0]
         fi = self.field_indexes
         hackattempt = False
+
         def cleanchars(val, key):
             if isinstance(val, str):
                 if key == 'state':
@@ -231,14 +234,14 @@ class Connector:
                         # indication of corrupted state
                         hackattempt = True
                         return 'XX'
-                    return val.upper() # tx => TX
+                    return val.upper()  # tx => TX
                 if '\x00' in val:
                     hackattempt = True
                     # it would be nice to have a longer in-place message,
                     # but we don't want to break char-count maximums
                     return val.replace('\x00', 'X')
             return val
-        event_fields = {k:cleanchars(event_row[fi[k]], k) for k in self.common_fields}
+        event_fields = {k: cleanchars(event_row[fi[k]], k) for k in self.common_fields}
         signuppage = event_row[fi['signuppage.name']]
         campaign_slug = event_row[fi['ec.name']]
         e_id = event_row[fi['ee.id']]
@@ -295,7 +298,7 @@ class Connector:
                                                and not event_row[fi['is_private']]),
                              'private_phone': event_row[fi['recentphone.value']] or '',
                              'phone': event_row[fi['public_phone']] or '',
-                             'url': rsvp_url, #could also link to search page with hash
+                             'url': rsvp_url,  # could also link to search page with hash
                              'slug': slug,
                              'osdi_origin_system': self.base_url,
                              'ticket_type': CHOICES['open'],
@@ -319,7 +322,7 @@ class Connector:
                                  'hack': hackattempt,
                                  'campaign_slug': campaign_slug,
                              }),
-                         })
+                             })
         for df in self.date_fields:
             if event_fields[df]:
                 event_fields[df] = datetime.datetime.strptime(event_fields[df], DATE_FMT)
@@ -356,14 +359,15 @@ class Connector:
                                                 additional_where=additional_where,
                                                 additional_params=additional_params,
                                                 max_results=min(10000, max_events))
-            if events:
-                for event_row in events:
-                    e_id = event_row[self.field_indexes['ee.id']]
-                    if e_id in all_events:
-                        all_events[e_id].append(event_row)
-                    else:
-                        all_events[e_id] = [event_row]
-                        event_count = event_count + 1
+            if not events:
+                break
+            for event_row in events:
+                e_id = event_row[self.field_indexes['ee.id']]
+                if e_id in all_events:
+                    all_events[e_id].append(event_row)
+                else:
+                    all_events[e_id] = [event_row]
+                    event_count = event_count + 1
         return {'events': [self._convert_event(event_rows) for event_rows in all_events.values()],
                 'last_updated': datetime.datetime.utcnow().strftime(DATE_FMT)}
 
@@ -371,7 +375,7 @@ class Connector:
         res = self.akapi.get_event(event.organization_source_pk)
         if 'res' in res:
             eventfield_list = res['res'].json().get('fields', {})
-            eventfields = {ef['name']:ef['id'] for ef in eventfield_list}
+            eventfields = {ef['name']: ef['id'] for ef in eventfield_list}
             for r in reviews:
                 if r.key in ('review_status', 'prep_status'):
                     self.akapi.set_event_field(event.organization_source_pk,
@@ -427,13 +431,14 @@ class Connector:
             if hosts:
                 for hostpk, host in hosts.items():
                     if int(hostpk) not in self.ignore_hosts\
-                       and (not event.organization_host_id\
+                       and (not event.organization_host_id
                             or hostpk != event.organization_host.member_system_pk):
                         additional_hosts.append(host)
         return additional_hosts
 
     def get_extra_event_management_html(self, event):
         additional_hosts = self.get_additional_hosts(event)
+
         def host_format(host):
             # glyphicon glyphicon-envelope
             # glyphicon glyphicon-earphone
