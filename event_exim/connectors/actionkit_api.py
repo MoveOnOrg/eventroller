@@ -361,8 +361,6 @@ class Connector:
                                                 max_results=min(10000, max_events))
             if not events:
                 break
-            if len(events) == 0:
-                break
             for event_row in events:
                 e_id = event_row[self.field_indexes['ee.id']]
                 if e_id in all_events:
