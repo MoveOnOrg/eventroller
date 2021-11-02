@@ -34,7 +34,7 @@ class EventSource(models.Model):
     This represents a source of data to fill event_store.models.Event
 
     One question is how best to connect an eventsource to the Event
-   
+
     """
     name = models.CharField(max_length=128, help_text="e.g. campaign or just describe the system")
     origin_organization = models.ForeignKey(Organization, related_name='source')
@@ -252,6 +252,7 @@ class EventDupeGuesses(models.Model):
             Things that will muddle screening for duplicates:
             * Bad data, e.g. zip code typos, errors converting local time to starts_at_utc.
             * Missing data, e.g. virtual events with no zip code/location data
+            Returns a QuerySet of zip + starts_at_utc pairs which match more than one event.
         """
         if last_update is None:
             return (
@@ -267,22 +268,27 @@ class EventDupeGuesses(models.Model):
                 )
                 .exclude(zip='')
             )
-        return (
-            Event.objects.values('zip', 'starts_at_utc')
-            .annotate(count=Count('id'))
-            .order_by()
-            .filter(
-                count__gt=1,
+        # For ONLY new events, compare to all events to check for duplicates
+        new_events = Event.objects.values('zip', 'starts_at_utc').order_by().filter(
                 dupe_id__isnull=True,
                 zip__isnull=False,
                 starts_at_utc__isnull=False,
                 updated_at_gt=last_update,
                 status='active'
+            ).exclude(zip='')
+        dupe_events = Event.objects.values('zip', 'starts_at_utc').annotate(count=Count('id')).none()
+        for new_event in new_events:
+            dupes = Event.objects.values('zip', 'starts_at_utc').annotate(count=Count('id')).filter(
+                zip=new_event['zip'], starts_at_utc=new_event['starts_at_utc']
+            ).filter(
+                count__gt=1,
+                dupe_id__isnull=True,
+                status='active'
             )
-            .exclude(zip='')
-        )
+            dupe_events = dupe_events.union(dupes)
+        return dupes
 
-    @staticmethod
+    @ staticmethod
     def record_potential_dupes(potential_dupes):
         message = 'Recording new potential duplicate events: \n'
         for dupe in potential_dupes:
