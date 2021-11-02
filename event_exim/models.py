@@ -261,7 +261,6 @@ class EventDupeGuesses(models.Model):
                 .order_by()
                 .filter(
                     count__gt=1,
-                    dupe_id__isnull=True,
                     zip__isnull=False,
                     starts_at_utc__isnull=False,
                     status='active'
