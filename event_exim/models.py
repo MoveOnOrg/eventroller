@@ -272,7 +272,7 @@ class EventDupeGuesses(models.Model):
                 dupe_id__isnull=True,
                 zip__isnull=False,
                 starts_at_utc__isnull=False,
-                updated_at_gt=last_update,
+                updated_at__gt=last_update,
                 status='active'
             ).exclude(zip='')
         dupe_events = Event.objects.values('zip', 'starts_at_utc').annotate(count=Count('id')).none()
