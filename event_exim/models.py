@@ -278,8 +278,7 @@ class EventDupeGuesses(models.Model):
         dupe_events = Event.objects.values('zip', 'starts_at_utc').annotate(count=Count('id')).none()
         for new_event in new_events:
             dupes = Event.objects.values('zip', 'starts_at_utc').annotate(count=Count('id')).filter(
-                zip=new_event['zip'], starts_at_utc=new_event['starts_at_utc']
-            ).filter(
+                zip=new_event['zip'], starts_at_utc=new_event['starts_at_utc'],
                 count__gt=1,
                 dupe_id__isnull=True,
                 status='active'
