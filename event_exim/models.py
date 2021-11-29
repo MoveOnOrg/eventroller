@@ -27,19 +27,20 @@ CRM_TYPES = {
 
 event_source_updated = Signal(providing_args=["event_data", "last_update"])
 
+
 class EventSource(models.Model):
 
     """
     This represents a source of data to fill event_store.models.Event
 
     One question is how best to connect an eventsource to the Event
-   
+
     """
     name = models.CharField(max_length=128, help_text="e.g. campaign or just describe the system")
     origin_organization = models.ForeignKey(Organization, related_name='source')
     osdi_name = models.CharField(max_length=765)
 
-    crm_type = models.CharField(max_length=16, choices=[(k,k) for k in CRM_TYPES])
+    crm_type = models.CharField(max_length=16, choices=[(k, k) for k in CRM_TYPES])
 
     crm_data = models.TextField(null=True, blank=True)
 
@@ -49,7 +50,7 @@ class EventSource(models.Model):
         (3, 'daily pull'),
         (4, 'hourly pull'),))
 
-    allows_updates = models.IntegerField(default=0, choices=((0,'no'), (1,'yes')), help_text='as sink')
+    allows_updates = models.IntegerField(default=0, choices=((0, 'no'), (1, 'yes')), help_text='as sink')
 
     #(test connection button)
     last_update = models.CharField(max_length=128, null=True, blank=True)
@@ -93,7 +94,7 @@ class EventSource(models.Model):
         event_source_updated.send(self, event_data=event_data, last_update=self.last_update)
 
     def update_events_from_dicts(self, event_dicts):
-        all_events = {str(e['organization_source_pk']):e for e in event_dicts}
+        all_events = {str(e['organization_source_pk']): e for e in event_dicts}
         new_host_ids = set([e['organization_host'].member_system_pk
                             for e in all_events.values()
                             if e['organization_host']])
@@ -101,7 +102,7 @@ class EventSource(models.Model):
                                              organization_source=self))
         # 2. save hosts, new and existing Activist records
         host_update_fields = ('hashed_email', 'email', 'name', 'phone')
-        existing_hosts = {a.member_system_pk:a
+        existing_hosts = {a.member_system_pk: a
                           for a in Activist.objects.filter(member_system=self,
                                                            member_system_pk__in=new_host_ids)}
         for e in all_events.values():
@@ -114,7 +115,7 @@ class EventSource(models.Model):
                         if getattr(host_by_pk, hf) != getattr(ehost, hf):
                             ehost.save()
                             existing_hosts[ehost.member_system_pk] = ehost
-                            break #inner loop
+                            break  # inner loop
                 else:
                     ehost.save()
                     existing_hosts[ehost.member_system_pk] = ehost
@@ -131,14 +132,14 @@ class EventSource(models.Model):
 
     def update_event_from_dict(self, event, new_event_dict):
         changed = False
-        for k,v in new_event_dict.items():
+        for k, v in new_event_dict.items():
             if k == 'organization_host' and event.organization_host:
                 if not event.organization_host.likely_same(v):
                     event.organization_host = v
                     changed = True
             else:
-                if getattr(event,k) != v:
-                    setattr(event,k,v)
+                if getattr(event, k) != v:
+                    setattr(event, k, v)
                     changed = True
         if changed:
             event.save()
@@ -151,7 +152,7 @@ class EventSource(models.Model):
             possible_sources = getattr(settings, 'EVENT_SOURCES', {})
         results = {}
         if source:
-            possible_sources = {k:v for k,v in possible_sources.items() if k==source}
+            possible_sources = {k: v for k, v in possible_sources.items() if k == source}
         for source_name, source_data in possible_sources.items():
             data = source_data.get('autocreate')
             #validate
@@ -225,77 +226,97 @@ class EventSource(models.Model):
 
 class EventDupeManager(models.Manager):
     def create_event_dupe(self, source_event, dupe_event):
-        event_dupe = self.create(source_event = source_event, dupe_event = dupe_event, decision = 0)
+        event_dupe = self.create(source_event=source_event, dupe_event=dupe_event, decision=0)
         event_dupe.save()
         return event_dupe.id
+
 
 class EventDupeGuesses(models.Model):
     source_event = models.ForeignKey(Event, related_name='dupe_guesses')
     dupe_event = models.ForeignKey(Event, related_name='dupe_guess_sources')
 
-    decision = models.IntegerField(choices=( (0, 'undecided'),
-                                             (1, 'not a duplicate'),
-                                             (2, 'yes, duplicates')), 
-                                             verbose_name = 'Status',
-                                             null = True,
-                                             blank = True
-                                            )
+    decision = models.IntegerField(choices=((0, 'undecided'),
+                                            (1, 'not a duplicate'),
+                                            (2, 'yes, duplicates')),
+                                   verbose_name='Status',
+                                   null=True,
+                                   blank=True
+                                   )
 
     class Meta:
-        unique_together = (('source_event','dupe_event'),)
-  
+        unique_together = (('source_event', 'dupe_event'),)
+
     @staticmethod
-    def get_potential_dupes():
+    def get_potential_dupes(last_update=None):
         """
             Things that will muddle screening for duplicates:
             * Bad data, e.g. zip code typos, errors converting local time to starts_at_utc.
             * Missing data, e.g. virtual events with no zip code/location data
+            Returns a QuerySet of zip + starts_at_utc pairs which match more than one event.
         """
-        return (
-            Event.objects.values('zip','starts_at_utc')
-            .annotate(count = Count('id'))
-            .order_by()
-            .filter(
-                count__gt = 1,
-                dupe_id__isnull = True,
-                zip__isnull = False,
-                starts_at_utc__isnull = False,
-                status = 'active'
+        if last_update is None:
+            return (
+                Event.objects.values('zip', 'starts_at_utc')
+                .annotate(count=Count('id'))
+                .order_by()
+                .filter(
+                    count__gt=1,
+                    zip__isnull=False,
+                    starts_at_utc__isnull=False,
+                    status='active'
+                )
+                .exclude(zip='')
             )
-            .exclude(zip='')
-        )
+        # For ONLY new events, compare to all events to check for duplicates
+        new_events = Event.objects.values('zip', 'starts_at_utc').order_by().filter(
+                dupe_id__isnull=True,
+                zip__isnull=False,
+                starts_at_utc__isnull=False,
+                updated_at__gt=last_update,
+                status='active'
+            ).exclude(zip='')
+        dupe_events = Event.objects.values('zip', 'starts_at_utc').annotate(count=Count('id')).none()
+        for new_event in new_events:
+            dupes = Event.objects.values('zip', 'starts_at_utc').annotate(count=Count('id')).filter(
+                zip=new_event['zip'], starts_at_utc=new_event['starts_at_utc'],
+                count__gt=1,
+                dupe_id__isnull=True,
+                status='active'
+            )
+            dupe_events = dupe_events.union(dupes)
+        return dupes
 
-    @staticmethod    
+    @ staticmethod
     def record_potential_dupes(potential_dupes):
         message = 'Recording new potential duplicate events: \n'
         for dupe in potential_dupes:
             events = (
                 Event.objects
-                .filter(zip = dupe['zip'], starts_at_utc = dupe['starts_at_utc'])
+                .filter(zip=dupe['zip'], starts_at_utc=dupe['starts_at_utc'])
                 .order_by('id')
             )
             for x in range(dupe['count']):
-                for y in range(x+1,dupe['count']):
+                for y in range(x+1, dupe['count']):
                     source_event = events[x]
                     dupe_event = events[y]
                     answer = EventDupeGuesses.objects.get_or_create(
-                        source_event = source_event, 
-                        dupe_event = dupe_event, 
-                        decision = 0
+                        source_event=source_event,
+                        dupe_event=dupe_event,
+                        decision=0
                     )
                     if not answer[1]:
                         message += (
                             "Duplicate event guess for {} and {} already recorded \n"
                             .format(source_event.id, dupe_event.id)
                         )
-                    else:       
+                    else:
                         message += (
                             "Recorded duplicate guess: Events {} and {} \n"
                             .format(source_event.id, dupe_event.id)
                         )
         return message
 
-    # Currently doesn't handle the case where an event has more than one duplicate. 
+    # Currently doesn't handle the case where an event has more than one duplicate.
     # Implementing this should wait until we have a clear use case for dupe_id on events
     # @receiver(post_save, sender = EventDupeGuesses, dispatch_uid = 'update_event_dupe')
     # def update_event_dupe_id(sender, instance, **kwargs):
@@ -316,9 +337,9 @@ class Org2OrgShare(models.Model):
   event_source = models.ForeignKey(EventSource, related_name='share_sources')
   event_sink = models.ForeignKey(EventSource, related_name='share_sinks')
 
-  status = models.IntegerField(choices=( (-1, 'disabled'),
-                                         (0, 'offered'),
-                                         (1, 'enabled')))
+  status = models.IntegerField(choices=((-1, 'disabled'),
+                                        (0, 'offered'),
+                                        (1, 'enabled')))
 
   filters = models.TextField(null=True, blank=True)
 
