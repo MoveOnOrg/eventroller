@@ -283,7 +283,7 @@ class EventDupeGuesses(models.Model):
                 dupe_id__isnull=True,
                 status='active'
             )
-            dupe_events = dupe_events.union(dupes)
+            dupe_events = dupe_events | dupes
         return dupe_events
 
     @ staticmethod
