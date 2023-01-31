@@ -7,7 +7,18 @@ except ImportError:
     from pip.req import parse_requirements
 
 install_reqs = parse_requirements('requirements.txt', session='hack')
-reqs = [str(ir.req) for ir in install_reqs]
+
+reqs = []
+
+try:
+    reqs = [str(ir.req) for ir in install_reqs]
+except AttributeError:
+    reqs = [str(ir.requirement) for ir in install_reqs]
+
+for i in range(len(reqs)):
+    if "git+" in reqs[i]:
+        lib_name = reqs[i].split("egg=", 1)[1]
+        reqs[i] = f'{lib_name} @ {reqs[i]}'
 
 setup(
     name='eventroller',

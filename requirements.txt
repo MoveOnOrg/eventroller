@@ -16,9 +16,8 @@ drf-hal-json==0.9.1
 
 mockredispy
 django-redis~=4.4
-django-cachalot
 
 boto3~=1.20
 botocore~=1.23
-zappa==0.56
+zappa==0.55
 flake8
